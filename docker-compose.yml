@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: facturador_db
+    restart: always
+    environment:
+      POSTGRES_DB: facturador_arca
+      POSTGRES_USER: arca_user
+      POSTGRES_PASSWORD: arca_password_secure_2026
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: facturador_arca
+    restart: always
+    ports:
+      - "5050:5050"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://arca_user:arca_password_secure_2026@db:5432/facturador_arca
+    env_file:
+      - .env
+    volumes:
+      - ./certs:/app/certs
+
+volumes:
+  postgres_data:

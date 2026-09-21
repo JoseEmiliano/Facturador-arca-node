@@ -1,0 +1,9 @@
+node_modules/
+.env
+downloads/
+*.log
+*.tar
+certs/*.key
+certs/*.crt
+certs/*.csr
+.DS_Store

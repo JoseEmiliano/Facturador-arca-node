@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facturador PyME - GESTIONCLOUD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#090d16',
+                        darkCard: '#111827',
+                        accent: '#38bdf8'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-darkBg text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+    <!-- PANTALLA LOGIN -->
+    <div id="view-login" class="flex-1 flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-darkCard border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
+            <div class="text-center">
+                <span class="text-4xl">🧾</span>
+                <h1 class="text-2xl font-black text-sky-400 mt-2">GESTIONCLOUD.COM.AR</h1>
+                <p class="text-xs text-slate-400 mt-1">Facturación Electrónica ARCA Multi-Tenant</p>
+            </div>
+            <div id="login-error" class="hidden p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs text-center font-medium"></div>
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Correo Electrónico</label>
+                    <input type="email" id="login-email" value="demo@gestioncloud.com.ar" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-sky-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Contraseña</label>
+                    <input type="password" id="login-pass" value="demo1234" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-sky-500">
+                </div>
+                <button type="submit" id="btn-login-submit" class="w-full py-2.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-lg transition text-sm">
+                    Iniciar Sesión
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- PANTALLA APP (SPA) -->
+    <div id="view-app" class="hidden flex-1 flex flex-col min-h-screen">
+        <!-- Top Navbar -->
+        <header class="border-b border-slate-800 bg-darkCard/95 sticky top-0 z-30 px-4 md:px-6 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-white text-xl p-1">☰</button>
+                <span class="text-2xl">🧾</span>
+                <div>
+                    <h1 id="hdr-empresa" class="font-bold text-sm md:text-base text-sky-400 leading-tight">GESTIONCLOUD LABS</h1>
+                    <p id="hdr-user-info" class="text-[11px] text-slate-400">Cargando datos...</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2 md:space-x-3">
+                <div class="hidden sm:flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-3 py-1 rounded-full text-xs">
+                    <span id="hdr-plan" class="text-amber-400 font-bold uppercase">FREE</span>
+                    <span class="text-slate-500">|</span>
+                    <span class="text-slate-300">Uso: <strong id="hdr-uso" class="text-sky-400">0</strong>/<span id="hdr-limite">500</span></span>
+                </div>
+
+                <a id="btn-backup-hdr" href="#" onclick="descargarBackup(event)" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                    💾 <span class="hidden md:inline">Backup BD</span>
+                </a>
+
+                <button onclick="cerrarSesion()" class="text-xs text-red-400 hover:underline px-2 font-medium">Salir</button>
+            </div>
+        </header>
+
+        <!-- Layout Body -->
+        <div class="flex-1 flex overflow-hidden">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 w-64 bg-darkCard border-r border-slate-800 p-4 space-y-1 transition-transform duration-200 z-40">
+                <div class="md:hidden flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
+                    <span class="text-xs font-bold uppercase text-slate-400">Menú</span>
+                    <button onclick="toggleSidebar()" class="text-slate-400 text-lg">✕</button>
+                </div>
+
+                <button onclick="cambiarSeccion('pos')" id="nav-pos" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-sky-400 bg-slate-800/80">
+                    ⚡ <span>Nueva Venta / POS</span>
+                </button>
+                <button onclick="cambiarSeccion('comprobantes')" id="nav-comprobantes" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/40">
+                    📚 <span>Comprobantes</span>
+                </button>
+                <button onclick="cambiarSeccion('bi')" id="nav-bi" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/40">
+                    📈 <span>Reportes Gráficos BI</span>
+                </button>
+                <button onclick="cambiarSeccion('clientes')" id="nav-clientes" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/40">
+                    👥 <span>Directorio Clientes</span>
+                </button>
+                <button onclick="cambiarSeccion('productos')" id="nav-productos" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/40">
+                    📦 <span>Catálogo Productos</span>
+                </button>
+                <div id="nav-admin-section" class="pt-4 border-t border-slate-800/80 space-y-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-3">Administración</span>
+                    <button onclick="cambiarSeccion('puntos-venta')" id="nav-puntos-venta" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/40">
+                        🏢 <span>Puntos de Venta (PV)</span>
+                    </button>
+                    <button onclick="cambiarSeccion('equipo')" id="nav-equipo" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/40">
+                        🛡️ <span>Equipo & Vendedores</span>
+                    </button>
+                </div>
+            </nav>
+
+            <!-- Área Principal -->
+            <main class="flex-1 overflow-y-auto p-4 md:p-6">
+                <!-- 1. SECCIÓN POS (VENTA COMERCIAL PROFESIONAL) -->
+                <section id="sec-pos" class="spa-sec grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div class="lg:col-span-8 bg-darkCard border border-slate-800 rounded-xl p-5 md:p-6 space-y-5 shadow-xl">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                            <div>
+                                <h2 class="text-base md:text-lg font-bold text-slate-200">Terminal de Facturación</h2>
+                                <p class="text-xs text-slate-400">Emisión en línea con desglose oficial de ítems</p>
+                            </div>
+                            <span class="text-xs text-slate-400">Cupo mensual restante: <strong id="pos-cupo" class="text-sky-400 font-bold">500</strong></span>
+                        </div>
+
+                        <form onsubmit="emitirFactura(event)" class="space-y-4">
+                            <!-- Datos de Encabezado Fiscal -->
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1 font-semibold">Punto de Venta</label>
+                                    <select id="pos-pv" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs font-bold text-sky-400 focus:outline-none"></select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1 font-semibold">Tipo Comprobante</label>
+                                    <select id="pos-tipo-cmp" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs focus:outline-none">
+                                        <option value="11" selected>Factura C (Monotributo)</option>
+                                        <option value="6">Factura B (Resp. Inscripto)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1 font-semibold">Concepto Fiscal</label>
+                                    <select id="pos-concepto" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs focus:outline-none">
+                                        <option value="1" selected>Productos</option>
+                                        <option value="2">Servicios</option>
+                                        <option value="3">Productos y Servicios</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Cliente Receptor -->
+                            <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-lg space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cliente Receptor</span>
+                                    <button type="button" onclick="setConsumidorFinal()" class="text-xs text-sky-400 hover:underline font-semibold flex items-center gap-1">
+                                        ⚡ Venta Genérica (Consumidor Final)
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 mb-1">Cargar de Directorio</label>
+                                        <select id="pos-select-cliente" onchange="seleccionarClienteRapido(this.value)" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-sky-400 focus:outline-none">
+                                            <option value="">-- Cliente guardado --</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 mb-1">Condición Frente al IVA</label>
+                                        <select id="pos-cli-iva" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs focus:outline-none">
+                                            <option value="Consumidor Final" selected>Consumidor Final</option>
+                                            <option value="Responsable Inscripto">Responsable Inscripto</option>
+                                            <option value="Responsable Monotributo">Responsable Monotributo</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 mb-1">Razón Social / Nombre</label>
+                                        <input type="text" id="pos-cli-nombre" value="Consumidor Final" placeholder="Ej: Mateo Nuñez" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs focus:outline-none focus:border-sky-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 mb-1">CUIT / DNI (0 = Sin identificar)</label>
+                                        <input type="text" id="pos-cli-doc" value="0" placeholder="Ej: 20328905789" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs focus:outline-none focus:border-sky-500 font-mono">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- GRILLA DE PRODUCTOS / CARRITO MULTI-RENGLÓN -->
+                            <div class="space-y-3">
+                                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Ítems a Facturar (Detalle)</span>
+                                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                                        <select id="pos-select-prod" onchange="agregarProductoDesdeCatalogo(this.value)" class="bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs text-emerald-400 focus:outline-none flex-1">
+                                            <option value="">+ Añadir desde Catálogo</option>
+                                        </select>
+                                        <button type="button" onclick="agregarRenglonManual()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded border border-slate-700 whitespace-nowrap">
+                                            + Fila Manual
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="border border-slate-800 rounded-lg overflow-x-auto">
+                                    <table class="w-full text-left text-xs">
+                                        <thead class="bg-slate-800/80 text-slate-400 uppercase text-[10px]">
+                                            <tr>
+                                                <th class="p-2.5 w-24">Código</th>
+                                                <th class="p-2.5">Descripción / Producto</th>
+                                                <th class="p-2.5 w-20 text-center">Cant</th>
+                                                <th class="p-2.5 w-28 text-right">Precio Unit ($)</th>
+                                                <th class="p-2.5 w-28 text-right">Subtotal ($)</th>
+                                                <th class="p-2.5 w-12 text-center">✕</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="pos-items-body" class="divide-y divide-slate-800/60">
+                                            <!-- Filas generadas por JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Total Calculado -->
+                                <div class="flex justify-end items-center gap-4 bg-slate-900/90 border border-slate-800 p-4 rounded-xl">
+                                    <span class="text-xs uppercase tracking-wider font-bold text-slate-400">Total a Facturar:</span>
+                                    <span id="pos-total-display" class="text-2xl md:text-3xl font-black text-sky-400 font-mono">$0.00</span>
+                                </div>
+                            </div>
+
+                            <button type="submit" id="btn-emitir" class="w-full py-3.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-black rounded-xl transition shadow-xl text-sm md:text-base">
+                                ⚡ Autorizar y Emitir en ARCA
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Lateral: Previsualización de Comprobante -->
+                    <div class="lg:col-span-4 flex flex-col items-center">
+                        <div id="ticket-placeholder" class="w-full h-full min-h-[350px] border border-dashed border-slate-800 rounded-xl flex flex-col items-center justify-center p-6 text-center text-slate-500">
+                            <span class="text-4xl mb-2">🧾</span>
+                            <p class="text-xs">El comprobante emitido aparecerá aquí listo con el desglose de productos y código QR oficial.</p>
+                        </div>
+
+                        <div id="ticket-card" class="hidden w-full flex flex-col items-center space-y-3">
+                            <div id="ticket-imprimible" class="bg-white text-black p-4 rounded shadow-2xl w-[300px] font-mono text-[11px] leading-snug">
+                                <div class="text-center">
+                                    <strong id="t-emp" class="text-xs">EMPRESA</strong><br>
+                                    CUIT: <span id="t-cuit"></span><br>
+                                    Factura: <span id="t-num" class="font-bold"></span><br>
+                                    Fecha: <span id="t-fecha"></span>
+                                </div>
+                                <div class="border-t border-dashed border-black my-2"></div>
+                                <div>
+                                    <strong>Cliente:</strong> <span id="t-cli"></span><br>
+                                    <strong>CUIT/DNI:</strong> <span id="t-cli-doc"></span><br>
+                                    <strong>Condición:</strong> <span id="t-cli-iva"></span>
+                                </div>
+                                <div class="border-t border-dashed border-black my-2"></div>
+                                <table style="width:100%; font-size:10px;">
+                                    <thead>
+                                        <tr style="border-bottom:1px dashed #000;">
+                                            <th style="text-align:left;">Cant x Detalle</th>
+                                            <th style="text-align:right;">Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="t-items-body"></tbody>
+                                </table>
+                                <div class="border-t border-dashed border-black my-2"></div>
+                                <div class="text-right">
+                                    <strong class="text-xs">TOTAL: <span id="t-total"></span></strong>
+                                </div>
+                                <div class="border-t border-dashed border-black my-2"></div>
+                                <div class="text-center">
+                                    CAE: <span id="t-cae"></span><br>
+                                    Vto: <span id="t-vto"></span><br>
+                                    <img id="t-qr" class="w-24 h-24 mx-auto my-2" alt="QR ARCA">
+                                    <span class="text-[9px]">Comprobante Autorizado por ARCA</span>
+                                </div>
+                            </div>
+
+                            <div class="w-[300px] grid grid-cols-2 gap-2">
+                                <button onclick="abrirModalVisor('a4', comprobanteActual)" class="py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded transition shadow flex items-center justify-center gap-1">
+                                    👁️ Factura A4
+                                </button>
+                                <button onclick="abrirModalVisor('ticket', comprobanteActual)" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded border border-slate-600 transition flex items-center justify-center gap-1">
+                                    👁️ Ticket 80mm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. SECCIÓN COMPROBANTES -->
+                <section id="sec-comprobantes" class="spa-sec hidden space-y-4">
+                    <div class="flex justify-between items-center bg-darkCard border border-slate-800 p-4 rounded-xl">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-200">Comprobantes Emitidos</h3>
+                            <p class="text-xs text-slate-400">Histórico completo con visor A4 y Ticket</p>
+                        </div>
+                        <a href="/api/exportar/excel" id="btn-export-excel" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded transition flex items-center gap-1">
+                            📊 Exportar a Excel (.xlsx)
+                        </a>
+                    </div>
+                    <div class="bg-darkCard border border-slate-800 rounded-xl overflow-x-auto shadow-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-800/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3.5">N° Comprobante</th>
+                                    <th class="p-3.5">Fecha</th>
+                                    <th class="p-3.5">Cliente</th>
+                                    <th class="p-3.5">Detalle Productos</th>
+                                    <th class="p-3.5 text-right">Importe</th>
+                                    <th class="p-3.5 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-comprobantes-body" class="divide-y divide-slate-800/60"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 3. SECCIÓN BI -->
+                <section id="sec-bi" class="spa-sec hidden space-y-6">
+                    <div class="flex justify-between items-center bg-darkCard border border-slate-800 p-4 rounded-xl">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-200">Inteligencia de Negocio (BI)</h3>
+                            <p class="text-xs text-slate-400">Curvas de facturación y ranking de productos más vendidos</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="cargarBI('mes')" class="btn-bi px-3 py-1 bg-sky-600 text-white rounded text-xs font-semibold" data-p="mes">30 Días</button>
+                            <button onclick="cargarBI('trimestre')" class="btn-bi px-3 py-1 bg-slate-800 text-slate-300 rounded text-xs font-semibold" data-p="trimestre">90 Días</button>
+                            <button onclick="cargarBI('anual')" class="btn-bi px-3 py-1 bg-slate-800 text-slate-300 rounded text-xs font-semibold" data-p="anual">Año</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div class="bg-darkCard border border-slate-800 p-4 rounded-xl">
+                            <span class="text-[11px] text-slate-400 block mb-1 uppercase font-semibold">Total Facturado</span>
+                            <span id="bi-total" class="text-2xl font-black text-sky-400 font-mono">$0.00</span>
+                        </div>
+                        <div class="bg-darkCard border border-slate-800 p-4 rounded-xl">
+                            <span class="text-[11px] text-slate-400 block mb-1 uppercase font-semibold">Comprobantes</span>
+                            <span id="bi-cant" class="text-2xl font-black text-slate-100">0</span>
+                        </div>
+                        <div class="bg-darkCard border border-slate-800 p-4 rounded-xl">
+                            <span class="text-[11px] text-slate-400 block mb-1 uppercase font-semibold">Ticket Promedio</span>
+                            <span id="bi-promedio" class="text-2xl font-black text-emerald-400 font-mono">$0.00</span>
+                        </div>
+                        <div class="bg-darkCard border border-slate-800 p-4 rounded-xl">
+                            <span class="text-[11px] text-slate-400 block mb-1 uppercase font-semibold">Día Pico</span>
+                            <span id="bi-mejor-dia" class="text-base font-bold text-amber-400">-</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div class="lg:col-span-8 bg-darkCard border border-slate-800 p-5 rounded-xl">
+                            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Curva de Facturación Diaria ($ ARS)</h4>
+                            <div class="h-64 relative">
+                                <canvas id="chartEvolucion"></canvas>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-4 bg-darkCard border border-slate-800 p-5 rounded-xl">
+                            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Top Productos Más Vendidos ($)</h4>
+                            <div class="h-64 relative flex items-center justify-center">
+                                <canvas id="chartDistribucion"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. SECCIÓN CLIENTES -->
+                <section id="sec-clientes" class="spa-sec hidden space-y-4">
+                    <div class="flex justify-between items-center bg-darkCard border border-slate-800 p-4 rounded-xl">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-200">Directorio de Clientes</h3>
+                            <p class="text-xs text-slate-400">Clientes registrados para selección en 1 clic</p>
+                        </div>
+                        <button onclick="abrirModal('modal-cliente')" class="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs rounded transition">+ Nuevo Cliente</button>
+                    </div>
+                    <div class="bg-darkCard border border-slate-800 rounded-xl overflow-x-auto shadow-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-800/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3.5">Nombre / Razón Social</th>
+                                    <th class="p-3.5">CUIT / DNI</th>
+                                    <th class="p-3.5">Condición IVA</th>
+                                    <th class="p-3.5">Contacto</th>
+                                    <th class="p-3.5 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-clientes-body" class="divide-y divide-slate-800/60"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 5. SECCIÓN PRODUCTOS -->
+                <section id="sec-productos" class="spa-sec hidden space-y-4">
+                    <div class="flex justify-between items-center bg-darkCard border border-slate-800 p-4 rounded-xl">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-200">Catálogo de Productos y Servicios</h3>
+                            <p class="text-xs text-slate-400">Artículos con código SKU y precio predeterminado</p>
+                        </div>
+                        <button onclick="abrirModal('modal-producto')" class="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded transition">+ Nuevo Producto</button>
+                    </div>
+                    <div class="bg-darkCard border border-slate-800 rounded-xl overflow-x-auto shadow-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-800/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3.5">Código SKU</th>
+                                    <th class="p-3.5">Descripción</th>
+                                    <th class="p-3.5">Tipo</th>
+                                    <th class="p-3.5 text-right">Precio Unitario ($)</th>
+                                    <th class="p-3.5 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-productos-body" class="divide-y divide-slate-800/60"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 6. SECCIÓN PUNTOS DE VENTA -->
+                <section id="sec-puntos-venta" class="spa-sec hidden space-y-4">
+                    <div class="flex justify-between items-center bg-darkCard border border-slate-800 p-4 rounded-xl">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-200">Puntos de Venta Fiscales (Multi-PV)</h3>
+                            <p class="text-xs text-slate-400">Cajas y sucursales habilitadas en ARCA</p>
+                        </div>
+                        <button onclick="abrirModal('modal-pv')" class="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs rounded transition">+ Nuevo PV</button>
+                    </div>
+                    <div class="bg-darkCard border border-slate-800 rounded-xl overflow-x-auto shadow-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-800/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3.5">Número PV</th>
+                                    <th class="p-3.5">Nombre / Ubicación</th>
+                                    <th class="p-3.5 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-pv-body" class="divide-y divide-slate-800/60"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 7. SECCIÓN EQUIPO -->
+                <section id="sec-equipo" class="spa-sec hidden space-y-4">
+                    <div class="flex justify-between items-center bg-darkCard border border-slate-800 p-4 rounded-xl">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-200">Equipo de Trabajo & Vendedores</h3>
+                            <p class="text-xs text-slate-400">Asignación de usuarios por Punto de Venta</p>
+                        </div>
+                        <button onclick="abrirModal('modal-usuario')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded transition">+ Nuevo Usuario</button>
+                    </div>
+                    <div class="bg-darkCard border border-slate-800 rounded-xl overflow-x-auto shadow-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-800/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3.5">Nombre</th>
+                                    <th class="p-3.5">Email</th>
+                                    <th class="p-3.5">Rol</th>
+                                    <th class="p-3.5">Punto de Venta</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-equipo-body" class="divide-y divide-slate-800/60"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- MODAL VISOR FACTURA LEGAL A4 / TICKET -->
+    <div id="modal-visor" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                <h3 id="visor-titulo" class="font-bold text-sm text-slate-200">Visor de Comprobante</h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="imprimirDesdeVisor()" class="px-3 py-1 bg-sky-500 text-slate-950 text-xs font-bold rounded hover:bg-sky-400">🖨️ Mandar a Imprimir</button>
+                    <button onclick="cerrarModal('modal-visor')" class="text-slate-400 hover:text-white px-2 font-bold text-base">✕</button>
+                </div>
+            </div>
+            <div id="visor-contenido" class="flex-1 overflow-y-auto p-6 bg-slate-950 flex items-center justify-center"></div>
+        </div>
+    </div>
+
+    <!-- MODALES DE FORMULARIOS -->
+    <div id="modal-pv" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-6 space-y-4">
+            <h3 class="font-bold text-base text-slate-100">Nuevo Punto de Venta</h3>
+            <form onsubmit="guardarPV(event)" class="space-y-3">
+                <input type="number" id="pv-num" min="1" max="9999" placeholder="Número PV (ej: 3)" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                <input type="text" id="pv-nom" placeholder="Nombre (ej: Sucursal Pilar)" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="cerrarModal('modal-pv')" class="px-3 py-1.5 bg-slate-800 text-xs rounded">Cancelar</button>
+                    <button type="submit" class="px-3 py-1.5 bg-sky-500 text-slate-950 font-bold text-xs rounded">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-usuario" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-6 space-y-4">
+            <h3 class="font-bold text-base text-slate-100">Nuevo Vendedor / Usuario</h3>
+            <form onsubmit="guardarUsuario(event)" class="space-y-3">
+                <input type="text" id="usr-nom" placeholder="Nombre completo" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                <input type="email" id="usr-eml" placeholder="Email de acceso" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                <input type="password" id="usr-pss" placeholder="Contraseña" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                <select id="usr-rol" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                    <option value="vendedor">Vendedor</option>
+                    <option value="admin">Administrador</option>
+                </select>
+                <select id="usr-pv-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs"></select>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="cerrarModal('modal-usuario')" class="px-3 py-1.5 bg-slate-800 text-xs rounded">Cancelar</button>
+                    <button type="submit" class="px-3 py-1.5 bg-amber-500 text-slate-950 font-bold text-xs rounded">Crear</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-cliente" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-6 space-y-4">
+            <h3 class="font-bold text-base text-slate-100">Nuevo Cliente</h3>
+            <form onsubmit="guardarCliente(event)" class="space-y-3">
+                <input type="text" id="cli-nom" placeholder="Razón Social / Nombre" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                <input type="text" id="cli-doc" placeholder="CUIT / DNI" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                <select id="cli-cond-iva" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                    <option value="Consumidor Final" selected>Consumidor Final</option>
+                    <option value="Responsable Inscripto">Responsable Inscripto</option>
+                    <option value="Responsable Monotributo">Responsable Monotributo</option>
+                </select>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="cerrarModal('modal-cliente')" class="px-3 py-1.5 bg-slate-800 text-xs rounded">Cancelar</button>
+                    <button type="submit" class="px-3 py-1.5 bg-sky-500 text-slate-950 font-bold text-xs rounded">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-producto" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-6 space-y-4">
+            <h3 class="font-bold text-base text-slate-100">Nuevo Producto</h3>
+            <form onsubmit="guardarProducto(event)" class="space-y-3">
+                <input type="text" id="prd-cod" placeholder="Código SKU (ej: PEN-32GB)" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                <input type="text" id="prd-nom" placeholder="Descripción (ej: Pendrive 32 GB Kingston)" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                <input type="number" step="0.01" id="prd-prc" placeholder="Precio ($ ARS)" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="cerrarModal('modal-producto')" class="px-3 py-1.5 bg-slate-800 text-xs rounded">Cancelar</button>
+                    <button type="submit" class="px-3 py-1.5 bg-emerald-500 text-slate-950 font-bold text-xs rounded">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPT SPA REACTIVO CON CARRITO DE PRODUCTOS -->
+    <script>
+        let token = localStorage.getItem('token');
+        let currentUser = null;
+        let puntosVenta = [];
+        let clientes = [];
+        let productos = [];
+        let comprobantes = [];
+        let comprobanteActual = null;
+        let chartEvolucion = null;
+        let chartDistribucion = null;
+
+        // Estado del Carrito Multi-Renglón
+        let carritoItems = [];
+
+        async function api(endpoint, options = {}) {
+            options.headers = options.headers || {};
+            if (token) options.headers['Authorization'] = 'Bearer ' + token;
+            if (options.body && typeof options.body === 'object') {
+                options.headers['Content-Type'] = 'application/json';
+                options.body = JSON.stringify(options.body);
+            }
+            const res = await fetch('/api' + endpoint, options);
+            if (res.status === 401) { cerrarSesion(); return null; }
+            return res.json();
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-pass').value;
+            const errBox = document.getElementById('login-error');
+            errBox.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const d = await res.json();
+                if (d.success && d.token) {
+                    token = d.token;
+                    localStorage.setItem('token', token);
+                    mostrarApp();
+                } else {
+                    errBox.innerText = d.error || 'Credenciales inválidas';
+                    errBox.classList.remove('hidden');
+                }
+            } catch (err) {
+                errBox.innerText = 'Error de conexión: ' + err.message;
+                errBox.classList.remove('hidden');
+            }
+        }
+
+        async function mostrarApp() {
+            document.getElementById('view-login').classList.add('hidden');
+            document.getElementById('view-app').classList.remove('hidden');
+            await cargarPerfil();
+            cambiarSeccion('pos');
+        }
+
+        async function cargarPerfil() {
+            const data = await api('/me');
+            if (!data || !data.user) { cerrarSesion(); return; }
+            currentUser = data.user;
+
+            document.getElementById('hdr-empresa').innerText = currentUser.razon_social;
+            document.getElementById('hdr-user-info').innerHTML = `CUIT: ${currentUser.cuit} | <strong>${currentUser.nombre}</strong> (<span class="text-amber-400 font-bold uppercase">${currentUser.rol}</span>) | PV: <span class="text-sky-400 font-bold font-mono">PV ${currentUser.pv_numero || 1}</span>`;
+            document.getElementById('hdr-plan').innerText = currentUser.plan;
+            document.getElementById('hdr-uso').innerText = data.emitidas_mes;
+            document.getElementById('hdr-limite').innerText = currentUser.limite_mensual;
+            document.getElementById('pos-cupo').innerText = currentUser.limite_mensual - data.emitidas_mes;
+
+            if (currentUser.rol === 'vendedor') {
+                const adminSec = document.getElementById('nav-admin-section');
+                if (adminSec) adminSec.style.display = 'none';
+                const bkp = document.getElementById('btn-backup-hdr');
+                if (bkp) bkp.style.display = 'none';
+            }
+
+            await cargarCatalogos();
+
+            // Inicializar carrito con 1 renglón por defecto
+            if (carritoItems.length === 0) {
+                carritoItems = [{
+                    id: Date.now(),
+                    codigo: 'SERV-01',
+                    descripcion: 'Servicio profesional de soporte y desarrollo',
+                    cantidad: 1,
+                    precio: 15000,
+                    subtotal: 15000
+                }];
+                renderizarCarrito();
+            }
+        }
+
+        async function cargarCatalogos() {
+            puntosVenta = await api('/puntos-venta') || [];
+            clientes = await api('/clientes') || [];
+            productos = await api('/productos') || [];
+
+            // Selector PV
+            const selPV = document.getElementById('pos-pv');
+            selPV.innerHTML = puntosVenta.map(pv => 
+                `<option value="${pv.numero}" ${pv.numero === (currentUser.pv_numero || 1) ? 'selected' : ''}>Punto ${pv.numero} - ${pv.nombre}</option>`
+            ).join('');
+            if (currentUser.rol === 'vendedor') selPV.disabled = true;
+
+            // Selector Clientes
+            const selCli = document.getElementById('pos-select-cliente');
+            selCli.innerHTML = '<option value="">-- Cliente registrado --</option>' +
+                clientes.map(c => `<option value="${c.id}">${c.nombre} (${c.cuit_dni})</option>`).join('');
+
+            // Selector Productos
+            const selPrd = document.getElementById('pos-select-prod');
+            selPrd.innerHTML = '<option value="">+ Añadir desde Catálogo</option>' +
+                productos.map(p => `<option value="${p.id}">${p.codigo ? '['+p.codigo+'] ' : ''}${p.nombre} ($${p.precio})</option>`).join('');
+        }
+
+        // GESTIÓN DEL CARRITO MULTI-RENGLÓN
+        function renderizarCarrito() {
+            const tbody = document.getElementById('pos-items-body');
+            let totalGeneral = 0;
+
+            if (carritoItems.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-500">No hay productos cargados en el comprobante. Agregue un renglón.</td></tr>`;
+            } else {
+                tbody.innerHTML = carritoItems.map((it, idx) => {
+                    totalGeneral += it.subtotal;
+                    return `
+                        <tr class="hover:bg-slate-800/30">
+                            <td class="p-2">
+                                <input type="text" value="${it.codigo || ''}" onchange="actualizarItem(${idx}, 'codigo', this.value)" placeholder="SKU" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-slate-300 font-mono focus:outline-none">
+                            </td>
+                            <td class="p-2">
+                                <input type="text" value="${it.descripcion}" onchange="actualizarItem(${idx}, 'descripcion', this.value)" required placeholder="Descripción del producto" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+                            </td>
+                            <td class="p-2 text-center">
+                                <input type="number" step="1" min="1" value="${it.cantidad}" onchange="actualizarItem(${idx}, 'cantidad', this.value)" required class="w-16 bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-center text-sky-400 font-bold focus:outline-none">
+                            </td>
+                            <td class="p-2 text-right">
+                                <input type="number" step="0.01" min="0" value="${it.precio}" onchange="actualizarItem(${idx}, 'precio', this.value)" required class="w-24 bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-right text-emerald-400 font-mono focus:outline-none">
+                            </td>
+                            <td class="p-2 text-right font-mono font-bold text-white text-xs">
+                                $${it.subtotal.toLocaleString('es-AR', {minimumFractionDigits: 2})}
+                            </td>
+                            <td class="p-2 text-center">
+                                <button type="button" onclick="eliminarRenglon(${idx})" class="text-red-400 hover:text-red-300 font-bold text-xs p-1">✕</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            document.getElementById('pos-total-display').innerText = '$' + totalGeneral.toLocaleString('es-AR', {minimumFractionDigits: 2});
+        }
+
+        function actualizarItem(idx, campo, valor) {
+            const item = carritoItems[idx];
+            if (campo === 'cantidad') {
+                item.cantidad = parseFloat(valor) || 1;
+            } else if (campo === 'precio') {
+                item.precio = parseFloat(valor) || 0;
+            } else {
+                item[campo] = valor;
+            }
+            item.subtotal = Math.round((item.cantidad * item.precio) * 100) / 100;
+            renderizarCarrito();
+        }
+
+        function agregarProductoDesdeCatalogo(id) {
+            if (!id) return;
+            const p = productos.find(prod => prod.id == id);
+            if (p) {
+                carritoItems.push({
+                    id: Date.now() + Math.random(),
+                    codigo: p.codigo || '-',
+                    descripcion: p.nombre,
+                    cantidad: 1,
+                    precio: parseFloat(p.precio) || 0,
+                    subtotal: parseFloat(p.precio) || 0
+                });
+                renderizarCarrito();
+            }
+            document.getElementById('pos-select-prod').value = '';
+        }
+
+        function agregarRenglonManual() {
+            carritoItems.push({
+                id: Date.now() + Math.random(),
+                codigo: '',
+                descripcion: '',
+                cantidad: 1,
+                precio: 0,
+                subtotal: 0
+            });
+            renderizarCarrito();
+        }
+
+        function eliminarRenglon(idx) {
+            carritoItems.splice(idx, 1);
+            renderizarCarrito();
+        }
+
+        // CLIENTE RECEPTOR
+        function setConsumidorFinal() {
+            document.getElementById('pos-cli-nombre').value = 'Consumidor Final';
+            document.getElementById('pos-cli-doc').value = '0';
+            document.getElementById('pos-cli-iva').value = 'Consumidor Final';
+            document.getElementById('pos-select-cliente').value = '';
+        }
+
+        function seleccionarClienteRapido(id) {
+            if (!id) { setConsumidorFinal(); return; }
+            const c = clientes.find(item => item.id == id);
+            if (c) {
+                document.getElementById('pos-cli-nombre').value = c.nombre;
+                document.getElementById('pos-cli-doc').value = c.cuit_dni;
+                document.getElementById('pos-cli-iva').value = c.condicion_iva;
+            }
+        }
+
+        // EMISIÓN FISCAL DE COMPROBANTE
+        async function emitirFactura(e) {
+            e.preventDefault();
+            if (carritoItems.length === 0) {
+                alert('Debe agregar al menos un producto a la factura.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-emitir');
+            btn.disabled = true;
+            btn.innerText = '⚡ Autorizando comprobante en ARCA...';
+
+            const payload = {
+                punto_venta: document.getElementById('pos-pv').value,
+                tipo_comprobante: document.getElementById('pos-tipo-cmp').value,
+                concepto: document.getElementById('pos-concepto').value,
+                receptor_nombre: document.getElementById('pos-cli-nombre').value,
+                receptor_doc: document.getElementById('pos-cli-doc').value,
+                receptor_condicion_iva: document.getElementById('pos-cli-iva').value,
+                items: carritoItems
+            };
+
+            const res = await api('/facturar', { method: 'POST', body: payload });
+            btn.disabled = false;
+            btn.innerText = '⚡ Autorizar y Emitir en ARCA';
+
+            if (res && res.success) {
+                comprobanteActual = res;
+                document.getElementById('hdr-uso').innerText = res.emitidas_mes;
+                document.getElementById('pos-cupo').innerText = currentUser.limite_mensual - res.emitidas_mes;
+
+                // Renderizar Ticket Lateral
+                document.getElementById('t-emp').innerText = res.razon_social;
+                document.getElementById('t-cuit').innerText = res.cuit;
+                document.getElementById('t-num').innerText = res.numero;
+                document.getElementById('t-fecha').innerText = res.fecha;
+                document.getElementById('t-cli').innerText = res.receptor_nombre;
+                document.getElementById('t-cli-doc').innerText = res.receptor_doc;
+                document.getElementById('t-cli-iva').innerText = res.receptor_condicion_iva || 'Consumidor Final';
+                document.getElementById('t-total').innerText = '$' + res.importe;
+                document.getElementById('t-cae').innerText = res.cae;
+                document.getElementById('t-vto').innerText = res.cae_vto;
+                document.getElementById('t-qr').src = res.qr;
+
+                // Renglones en Ticket Lateral
+                const tBody = document.getElementById('t-items-body');
+                tBody.innerHTML = res.items.map(it => `
+                    <tr>
+                        <td style="text-align:left;">${it.cantidad}x ${it.descripcion}</td>
+                        <td style="text-align:right;">$${it.subtotal.toFixed(2)}</td>
+                    </tr>
+                `).join('');
+
+                document.getElementById('ticket-placeholder').classList.add('hidden');
+                document.getElementById('ticket-card').classList.remove('hidden');
+
+                // Limpiar carrito para la próxima venta
+                carritoItems = [];
+                agregarRenglonManual();
+            } else {
+                alert('Error al emitir: ' + (res?.error || 'No autorizado'));
+            }
+        }
+
+        // NAVEGACIÓN
+        function cambiarSeccion(sec) {
+            document.querySelectorAll('.spa-sec').forEach(s => s.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(b => {
+                b.className = "nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/40";
+            });
+
+            const secEl = document.getElementById('sec-' + sec);
+            const navEl = document.getElementById('nav-' + sec);
+            if (secEl) secEl.classList.remove('hidden');
+            if (navEl) navEl.className = "nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-sky-400 bg-slate-800/80";
+
+            if (sec === 'comprobantes') cargarComprobantes();
+            if (sec === 'bi') setTimeout(() => cargarBI('mes'), 80);
+            if (sec === 'clientes') renderClientes();
+            if (sec === 'productos') renderProductos();
+            if (sec === 'puntos-venta') renderPV();
+            if (sec === 'equipo') renderEquipo();
+
+            if (window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+            }
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+        }
+
+        // COMPROBANTES HISTÓRICOS
+        async function cargarComprobantes() {
+            comprobantes = await api('/historico') || [];
+            const tbody = document.getElementById('tabla-comprobantes-body');
+            document.getElementById('btn-export-excel').href = `/api/exportar/excel?token=${token}`;
+
+            if (comprobantes.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No tenés facturas registradas.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = comprobantes.map((c, i) => `
+                <tr class="hover:bg-slate-800/30 transition">
+                    <td class="p-3.5 font-bold text-sky-400 font-mono">${c.numero}</td>
+                    <td class="p-3.5 text-slate-300">${c.fecha}</td>
+                    <td class="p-3.5 text-slate-300">${c.receptor_nombre} (${c.receptor_doc})</td>
+                    <td class="p-3.5 text-slate-300 max-w-xs truncate" title="${c.concepto_desc}">${c.concepto_desc}</td>
+                    <td class="p-3.5 text-right font-bold text-slate-100 font-mono">$${parseFloat(c.importe).toFixed(2)}</td>
+                    <td class="p-3.5 text-center space-x-1">
+                        <button onclick="verComprobanteHistorico(${i}, 'a4')" class="px-2 py-1 bg-sky-600/30 text-sky-400 rounded text-[11px] font-semibold">📄 A4</button>
+                        <button onclick="verComprobanteHistorico(${i}, 'ticket')" class="px-2 py-1 bg-slate-700 text-slate-200 rounded text-[11px] font-semibold">🖨️ Ticket</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function verComprobanteHistorico(idx, tipo) {
+            const c = comprobantes[idx];
+            abrirModalVisor(tipo, {
+                numero: c.numero,
+                fecha: c.fecha,
+                cuit: c.cuit_emisor || currentUser.cuit,
+                razon_social: currentUser.razon_social,
+                condicion_iva: currentUser.condicion_iva,
+                receptor_nombre: c.receptor_nombre,
+                receptor_doc: c.receptor_doc,
+                receptor_condicion_iva: c.receptor_condicion_iva || 'Consumidor Final',
+                items: c.items_json && c.items_json.length ? c.items_json : [{ codigo: '-', descripcion: c.concepto_desc, cantidad: 1, precio: parseFloat(c.importe), subtotal: parseFloat(c.importe) }],
+                importe: parseFloat(c.importe).toFixed(2),
+                cae: c.cae,
+                cae_vto: c.cae_vto,
+                qr: c.qr_base64
+            });
+        }
+
+        // BI REPORTES
+        async function cargarBI(periodo) {
+            document.querySelectorAll('.btn-bi').forEach(b => {
+                b.className = (b.dataset.p === periodo) 
+                    ? "btn-bi px-3 py-1 bg-sky-600 text-white rounded text-xs font-semibold"
+                    : "btn-bi px-3 py-1 bg-slate-800 text-slate-300 rounded text-xs font-semibold";
+            });
+
+            const data = await api(`/bi?periodo=${periodo}`);
+            if (!data) return;
+
+            document.getElementById('bi-total').innerText = '$' + data.total.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+            document.getElementById('bi-cant').innerText = data.cantidad;
+            document.getElementById('bi-promedio').innerText = '$' + data.promedio.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+            document.getElementById('bi-mejor-dia').innerText = data.mejor_dia;
+
+            const ctx1 = document.getElementById('chartEvolucion').getContext('2d');
+            if (chartEvolucion) chartEvolucion.destroy();
+            chartEvolucion = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: data.evolucion_fechas.length ? data.evolucion_fechas : ['Hoy'],
+                    datasets: [{
+                        label: 'Ventas ($)',
+                        data: data.evolucion_montos.length ? data.evolucion_montos : [0],
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#38bdf8'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            const ctx2 = document.getElementById('chartDistribucion').getContext('2d');
+            if (chartDistribucion) chartDistribucion.destroy();
+            chartDistribucion = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: data.top_conceptos_nombres.length ? data.top_conceptos_nombres : ['Sin ventas'],
+                    datasets: [{
+                        data: data.top_conceptos_montos.length ? data.top_conceptos_montos : [1],
+                        backgroundColor: ['#38bdf8', '#34d399', '#f59e0b', '#a855f7', '#64748b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 10, font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // CATÁLOGOS ABM
+        async function renderClientes() {
+            clientes = await api('/clientes') || [];
+            const tbody = document.getElementById('tabla-clientes-body');
+            tbody.innerHTML = clientes.map(c => `
+                <tr class="hover:bg-slate-800/30 transition">
+                    <td class="p-3.5 font-bold text-slate-200">${c.nombre}</td>
+                    <td class="p-3.5 font-mono text-slate-400">${c.cuit_dni}</td>
+                    <td class="p-3.5 text-slate-300">${c.condicion_iva}</td>
+                    <td class="p-3.5 text-slate-400">${c.email || ''} ${c.telefono || ''}</td>
+                    <td class="p-3.5 text-center"><button onclick="eliminarCliente(${c.id})" class="text-red-400 hover:underline">Eliminar</button></td>
+                </tr>
+            `).join('');
+        }
+
+        async function renderProductos() {
+            productos = await api('/productos') || [];
+            const tbody = document.getElementById('tabla-productos-body');
+            tbody.innerHTML = productos.map(p => `
+                <tr class="hover:bg-slate-800/30 transition">
+                    <td class="p-3.5 font-mono font-bold text-sky-400">${p.codigo || '-'}</td>
+                    <td class="p-3.5 font-semibold text-slate-200">${p.nombre}</td>
+                    <td class="p-3.5 uppercase text-[10px] text-slate-400 font-bold">${p.tipo}</td>
+                    <td class="p-3.5 text-right font-bold text-emerald-400 font-mono">$${parseFloat(p.precio).toFixed(2)}</td>
+                    <td class="p-3.5 text-center"><button onclick="eliminarProducto(${p.id})" class="text-red-400 hover:underline">Eliminar</button></td>
+                </tr>
+            `).join('');
+        }
+
+        async function renderPV() {
+            puntosVenta = await api('/puntos-venta') || [];
+            const tbody = document.getElementById('tabla-pv-body');
+            tbody.innerHTML = puntosVenta.map(pv => `
+                <tr class="hover:bg-slate-800/30 transition">
+                    <td class="p-3.5 font-bold font-mono text-sky-400">Punto ${pv.numero}</td>
+                    <td class="p-3.5 text-slate-200 font-semibold">${pv.nombre}</td>
+                    <td class="p-3.5 text-center">
+                        ${pv.numero !== 1 ? `<button onclick="eliminarPV(${pv.id})" class="text-red-400 hover:underline">Eliminar</button>` : '<span class="text-slate-600">Principal</span>'}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function renderEquipo() {
+            const users = await api('/usuarios') || [];
+            const tbody = document.getElementById('tabla-equipo-body');
+            tbody.innerHTML = users.map(u => `
+                <tr class="hover:bg-slate-800/30 transition">
+                    <td class="p-3.5 font-bold text-slate-200">${u.nombre}</td>
+                    <td class="p-3.5 text-slate-300 font-mono">${u.email}</td>
+                    <td class="p-3.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-sky-400">${u.rol}</span></td>
+                    <td class="p-3.5 text-slate-300 font-mono">PV ${u.pv_numero || 1} (${u.pv_nombre || 'Principal'})</td>
+                </tr>
+            `).join('');
+
+            const sel = document.getElementById('usr-pv-select');
+            if (sel) sel.innerHTML = puntosVenta.map(p => `<option value="${p.id}">PV ${p.numero} - ${p.nombre}</option>`).join('');
+        }
+
+        // VISOR MODAL EN PANTALLA (A4 Y TICKET)
+        function abrirModalVisor(tipo, f) {
+            const modal = document.getElementById('modal-visor');
+            const cont = document.getElementById('visor-contenido');
+            const tit = document.getElementById('visor-titulo');
+
+            const items = f.items || [];
+            const rowsHtml = items.map(it => `
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:6px; font-family:monospace; color:#64748b;">${it.codigo || '-'}</td>
+                    <td style="padding:6px;"><strong>${it.descripcion}</strong></td>
+                    <td style="padding:6px; text-align:center;">${it.cantidad}</td>
+                    <td style="padding:6px; text-align:right; font-family:monospace;">$${parseFloat(it.precio).toFixed(2)}</td>
+                    <td style="padding:6px; text-align:right; font-family:monospace; font-weight:bold;">$${parseFloat(it.subtotal).toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            if (tipo === 'a4') {
+                tit.innerText = `Factura Legal A4 - N° ${f.numero}`;
+                cont.innerHTML = `
+                    <div class="bg-white text-black p-8 rounded shadow-2xl w-full max-w-[650px] font-sans text-xs">
+                        <table style="width:100%; border-bottom:1.5px solid #0f172a; padding-bottom:10px;">
+                            <tr>
+                                <td style="width:45%; vertical-align:top;">
+                                    <h2 style="margin:0; color:#0284c7; font-size:16px; font-weight:bold;">${f.razon_social || currentUser.razon_social}</h2>
+                                    <span style="font-size:9px; color:#64748b; font-weight:bold;">COMPROBANTE FISCAL OFICIAL</span><br>
+                                    <strong>CUIT:</strong> ${f.cuit}<br>
+                                    <strong>Condición IVA:</strong> ${f.condicion_iva || currentUser.condicion_iva}
+                                </td>
+                                <td style="width:10%; text-align:center; vertical-align:top;">
+                                    <div style="border:1.5px solid #0f172a; border-radius:4px; padding:4px;"><strong>C</strong><br><span style="font-size:8px;">011</span></div>
+                                </td>
+                                <td style="width:45%; text-align:right; vertical-align:top;">
+                                    <h2 style="margin:0; font-size:16px; font-weight:bold;">FACTURA</h2>
+                                    <div style="font-size:13px; font-weight:bold; color:#0284c7; font-family:monospace;">N° ${f.numero}</div>
+                                    <strong>Fecha:</strong> ${f.fecha}
+                                </td>
+                            </tr>
+                        </table>
+
+                        <table style="width:100%; background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; margin-top:10px; padding:6px 10px;">
+                            <tr>
+                                <td style="width:60%;"><strong>Receptor:</strong> ${f.receptor_nombre} (Doc: ${f.receptor_doc})</td>
+                                <td style="width:40%; text-align:right;"><strong>IVA:</strong> ${f.receptor_condicion_iva || 'Consumidor Final'}</td>
+                            </tr>
+                        </table>
+
+                        <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+                            <thead>
+                                <tr style="background:#0f172a; color:#fff; font-size:10px;">
+                                    <th style="padding:6px; text-align:left; width:15%;">Código</th>
+                                    <th style="padding:6px; text-align:left;">Descripción del Producto</th>
+                                    <th style="padding:6px; text-align:center; width:10%;">Cant</th>
+                                    <th style="padding:6px; text-align:right; width:15%;">Precio Unit.</th>
+                                    <th style="padding:6px; text-align:right; width:15%;">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                            </tbody>
+                        </table>
+
+                        <div style="text-align:right; margin-top:14px;">
+                            <span style="font-size:12px; margin-right:8px;">TOTAL A PAGAR:</span>
+                            <span style="font-size:17px; font-weight:bold; color:#0284c7; font-family:monospace;">$${f.importe}</span>
+                        </div>
+
+                        <table style="width:100%; margin-top:16px; border-top:1.5px solid #0f172a; padding-top:10px;">
+                            <tr>
+                                <td style="vertical-align:middle; line-height:1.5;">
+                                    <strong>ARCA</strong> <span style="background:#0284c7; color:#fff; font-size:8px; padding:2px 4px; border-radius:3px;">WSFEV1</span><br>
+                                    <strong>CAE N°:</strong> <span style="font-family:monospace; font-weight:bold;">${f.cae}</span><br>
+                                    <strong>Fecha Vencimiento CAE:</strong> <span style="font-family:monospace;">${f.cae_vto}</span><br>
+                                    <span style="font-size:9px; color:#64748b;">Comprobante Autorizado por ARCA</span>
+                                </td>
+                                <td style="text-align:right;"><img src="${f.qr}" style="width:100px; height:100px; display:inline-block; border:1px solid #cbd5e1; padding:2px;" alt="QR"></td>
+                            </tr>
+                        </table>
+                    </div>
+                `;
+            } else {
+                tit.innerText = `Ticket Térmico 80mm - N° ${f.numero}`;
+                const ticketRows = items.map(it => `
+                    <tr>
+                        <td style="text-align:left;">${it.cantidad}x ${it.descripcion}</td>
+                        <td style="text-align:right;">$${parseFloat(it.subtotal).toFixed(2)}</td>
+                    </tr>
+                `).join('');
+
+                cont.innerHTML = `
+                    <div class="bg-white text-black p-5 rounded shadow-2xl w-[300px] font-mono text-xs text-center leading-snug">
+                        <strong style="font-size:13px;">${f.razon_social || currentUser.razon_social}</strong><br>
+                        CUIT: ${f.cuit}<br>
+                        Factura: ${f.numero}<br>
+                        Fecha: ${f.fecha}
+                        <div style="border-top:1px dashed #000; margin:8px 0;"></div>
+                        <div style="text-align:left;">
+                            <strong>Cliente:</strong> ${f.receptor_nombre}<br>
+                            <strong>Doc:</strong> ${f.receptor_doc} (${f.receptor_condicion_iva || 'Consumidor Final'})
+                        </div>
+                        <div style="border-top:1px dashed #000; margin:8px 0;"></div>
+                        <table style="width:100%; font-size:10.5px;">
+                            <thead>
+                                <tr style="border-bottom:1px dashed #000;">
+                                    <th style="text-align:left;">Cant x Detalle</th>
+                                    <th style="text-align:right;">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${ticketRows}
+                            </tbody>
+                        </table>
+                        <div style="border-top:1px dashed #000; margin:8px 0;"></div>
+                        <div style="text-align:right; font-size:13px;">
+                            <strong>TOTAL: $${f.importe}</strong>
+                        </div>
+                        <div style="border-top:1px dashed #000; margin:8px 0;"></div>
+                        CAE: ${f.cae}<br>Vto: ${f.cae_vto}<br>
+                        <img src="${f.qr}" style="width:100px; height:100px; margin:6px auto;" alt="QR">
+                        <small style="font-size:8.5px;">Comprobante Autorizado por ARCA</small>
+                    </div>
+                `;
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function imprimirDesdeVisor() {
+            const cont = document.getElementById('visor-contenido').innerHTML;
+            const ifr = document.createElement('iframe');
+            ifr.style.display = 'none';
+            document.body.appendChild(ifr);
+            ifr.contentWindow.document.open();
+            ifr.contentWindow.document.write(cont);
+            ifr.contentWindow.document.close();
+            ifr.contentWindow.focus();
+            ifr.contentWindow.print();
+            setTimeout(() => document.body.removeChild(ifr), 400);
+        }
+
+        function descargarBackup(e) {
+            e.preventDefault();
+            window.location.href = `/api/empresa/backup?token=${token}`;
+        }
+
+        function abrirModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function cerrarModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        async function guardarPV(e) {
+            e.preventDefault();
+            await api('/puntos-venta', {
+                method: 'POST',
+                body: { numero: document.getElementById('pv-num').value, nombre: document.getElementById('pv-nom').value }
+            });
+            cerrarModal('modal-pv');
+            renderPV();
+            cargarCatalogos();
+        }
+
+        async function guardarUsuario(e) {
+            e.preventDefault();
+            await api('/usuarios', {
+                method: 'POST',
+                body: {
+                    nombre: document.getElementById('usr-nom').value,
+                    email: document.getElementById('usr-eml').value,
+                    password: document.getElementById('usr-pss').value,
+                    rol: document.getElementById('usr-rol').value,
+                    punto_venta_id: document.getElementById('usr-pv-select').value
+                }
+            });
+            cerrarModal('modal-usuario');
+            renderEquipo();
+        }
+
+        async function guardarCliente(e) {
+            e.preventDefault();
+            await api('/clientes', {
+                method: 'POST',
+                body: {
+                    nombre: document.getElementById('cli-nom').value,
+                    cuit_dni: document.getElementById('cli-doc').value,
+                    condicion_iva: document.getElementById('cli-cond-iva').value
+                }
+            });
+            cerrarModal('modal-cliente');
+            renderClientes();
+            cargarCatalogos();
+        }
+
+        async function guardarProducto(e) {
+            e.preventDefault();
+            await api('/productos', {
+                method: 'POST',
+                body: {
+                    codigo: document.getElementById('prd-cod').value,
+                    nombre: document.getElementById('prd-nom').value,
+                    precio: document.getElementById('prd-prc').value
+                }
+            });
+            cerrarModal('modal-producto');
+            renderProductos();
+            cargarCatalogos();
+        }
+
+        async function eliminarPV(id) { if (confirm('¿Eliminar PV?')) { await api(`/puntos-venta/${id}`, { method: 'DELETE' }); renderPV(); } }
+        async function eliminarCliente(id) { if (confirm('¿Eliminar cliente?')) { await api(`/clientes/${id}`, { method: 'DELETE' }); renderClientes(); } }
+        async function eliminarProducto(id) { if (confirm('¿Eliminar producto?')) { await api(`/productos/${id}`, { method: 'DELETE' }); renderProductos(); } }
+
+        function cerrarSesion() {
+            localStorage.removeItem('token');
+            token = null;
+            currentUser = null;
+            document.getElementById('view-app').classList.add('hidden');
+            document.getElementById('view-login').classList.remove('hidden');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (token) mostrarApp();
+        });
+    </script>
+</body>
+</html>
