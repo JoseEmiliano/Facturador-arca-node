@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maxi Kiosco 24/7 - Sistema POS y Facturación Avanzada</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background-color: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; }
+        header { background-color: #1e293b; border-bottom: 1px solid #334155; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
+        main { flex: 1; padding: 1.5rem; max-width: 1400px; width: 100%; margin: 0 auto; }
+        .hidden { display: none !important; }
+        .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; padding: 1.25rem; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .btn-blue { background-color: #2563eb; color: white; padding: 0.6rem 1.2rem; border-radius: 0.5rem; border: none; font-weight: 600; cursor: pointer; transition: background 0.2s; width: 100%; }
+        .btn-blue:hover { background-color: #1d4ed8; }
+        .btn-green { background-color: #16a34a; color: white; padding: 0.75rem; border-radius: 0.5rem; border: none; font-weight: bold; font-size: 1rem; cursor: pointer; width: 100%; }
+        .btn-green:hover { background-color: #15803d; }
+        .btn-gray { background-color: #475569; color: white; padding: 0.5rem 1rem; border-radius: 0.35rem; border: none; cursor: pointer; font-size: 0.85rem; }
+        .btn-gray:hover { background-color: #334155; }
+        input, select { background-color: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; padding: 0.6rem; color: white; width: 100%; margin-top: 0.25rem; margin-bottom: 1rem; }
+        input:focus, select:focus { outline: none; border-color: #3b82f6; }
+        .tabs { display: flex; gap: 0.5rem; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .tab-btn { background-color: #1e293b; color: #94a3b8; border: none; padding: 0.6rem 1.2rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; }
+        .tab-btn.active { background-color: #2563eb; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .grid-pos { display: grid; grid-template-columns: 1fr 380px; gap: 1.5rem; }
+        .productos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; max-height: 70vh; overflow-y: auto; padding-right: 0.5rem; }
+        .prod-card { background-color: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; justify-content: space-between; }
+        .prod-card:hover { border-color: #3b82f6; transform: translateY(-2px); }
+        table { width: 100%; border-collapse: collapse; text-align: left; margin-top: 0.5rem; }
+        th { color: #94a3b8; border-bottom: 1px solid #334155; padding: 0.75rem; font-size: 0.85rem; }
+        td { border-bottom: 1px solid rgba(51,65,85,0.4); padding: 0.75rem; font-size: 0.9rem; }
+        .badge { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 500; }
+        .badge-admin { background-color: #7c2d12; color: #fed7aa; }
+        .badge-vend { background-color: #1e3a8a; color: #bfdbfe; }
+        .preview-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(2, 6, 23, 0.86); }
+        .modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(2, 6, 23, 0.86); }
+        .modal-content { width: min(100%, 500px); max-height: calc(100vh - 2rem); overflow-y: auto; padding: 1.5rem; background: #1e293b; border: 1px solid #475569; border-radius: .75rem; box-shadow: 0 10px 25px rgba(0,0,0,.45); }
+        .preview-dialog { width: min(100%, 920px); max-height: calc(100vh - 2rem); overflow: hidden; background: #f8fafc; color: #0f172a; border-radius: 1rem; box-shadow: 0 25px 60px rgba(0,0,0,.45); }
+        .preview-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; padding: 1.25rem 1.5rem; background: #1e293b; color: #f8fafc; }
+        .preview-title { font-size: 1.1rem; font-weight: 700; }
+        .preview-subtitle { margin-top: .25rem; color: #94a3b8; font-size: .8rem; }
+        .preview-actions, .preview-formats { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+        .preview-actions button, .preview-formats button { border: 0; border-radius: .45rem; padding: .55rem .8rem; font-weight: 600; cursor: pointer; }
+        .preview-actions .print-button { background: #2563eb; color: white; }
+        .preview-actions .email-button { background: #16a34a; color: white; }
+        .preview-actions .whatsapp-button { background: #059669; color: white; }
+        .preview-actions .close-button { background: #334155; color: #cbd5e1; font-size: 1.1rem; }
+        .preview-body { padding: 1rem 1.5rem 1.5rem; overflow-y: auto; max-height: calc(100vh - 7rem); }
+        .preview-formats { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #cbd5e1; }
+        .preview-formats button { background: #e2e8f0; color: #334155; }
+        .preview-formats button.active { background: #2563eb; color: white; }
+        .preview-hint { color: #64748b; font-size: .8rem; margin-right: .5rem; }
+        #contenidoDocumentoImprimible { min-height: 240px; padding: 1.5rem; background: white; border: 1px solid #cbd5e1; border-radius: .6rem; }
+        .document-ticket { width: 80mm; max-width: 100%; margin: 0 auto; padding: 1rem; color: #111827; background: white; font: 12px/1.35 "Courier New", monospace; }
+        .document-a4 { max-width: 800px; margin: 0 auto; padding: 2rem; color: #111827; background: white; font: 14px/1.4 Arial, sans-serif; }
+        .document-a4 .document-heading { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 2px solid #1e293b; }
+        .document-a4 .document-letter { padding: .5rem .8rem; border: 1px solid #64748b; font-size: 1.5rem; font-weight: 700; text-align: center; }
+        .document-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .document-table th, .document-table td { padding: .5rem; border-bottom: 1px solid #e2e8f0; color: #111827; }
+        .document-table th { background: #e2e8f0; color: #334155; }
+        .document-right { text-align: right; }
+        .document-center { text-align: center; }
+        .document-total { font-size: 1.25rem; font-weight: 700; }
+        .document-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; padding-top: 1rem; border-top: 1px solid #cbd5e1; }
+        .document-qr { width: 100px; height: 100px; object-fit: contain; }
+        @media(max-width: 700px) {
+            .preview-header { flex-direction: column; }
+            .preview-actions { width: 100%; }
+            .preview-actions button { flex: 1; }
+            .preview-body { padding: .75rem; }
+            .document-a4 { padding: 1rem; }
+            .document-a4 .document-heading, .document-footer { flex-direction: column; align-items: stretch; }
+        }
+        @media print {
+            body * { visibility: hidden !important; }
+            #contenidoDocumentoImprimible, #contenidoDocumentoImprimible * { visibility: visible !important; }
+            #contenidoDocumentoImprimible { position: absolute; left: 0; top: 0; width: 100%; border: 0; padding: 0; }
+            .document-ticket { width: 80mm; }
+            @page { margin: 8mm; }
+        }
+        @media(max-width: 900px) { .grid-pos { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <span style="font-size: 1.25rem; font-weight: bold; color: #60a5fa;">🏪 MAXI KIOSCO 24/7</span>
+                <span id="empresa-nombre" class="badge badge-admin">Cargando...</span>
+                <span id="pv-badge" class="badge" style="background-color: #334155; color: #e2e8f0;">Caja 1</span>
+            </div>
+            <div id="user-header-section" class="hidden" style="display: flex; align-items: center; gap: 1.25rem;">
+                <div style="text-align: right;">
+                    <span id="user-info" style="font-size: 0.9rem; font-weight: 600; display: block; color: #f8fafc;">Usuario</span>
+                    <span id="user-role-badge" class="badge badge-admin">Rol</span>
+                </div>
+                <button onclick="logout()" class="btn-gray" style="background-color: #dc2626;">Salir</button>
+            </div>
+        </header>
+<!-- MODAL DE VISTA PREVIA, IMPRESIÓN, PDF, WHATSAPP Y EMAIL -->
+<div id="modalImpresion" class="preview-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+  <div class="preview-dialog">
+    <div class="preview-header">
+      <div>
+        <h3 id="preview-title" class="preview-title">Vista previa del comprobante</h3>
+        <p class="preview-subtitle">Elegí un formato para revisar, imprimir o compartir.</p>
+      </div>
+      <div class="preview-actions">
+        <button id="botonImprimirPreview" onclick="imprimirFormato()" class="print-button hidden">Imprimir formato elegido</button>
+        <button onclick="enviarEmailModal()" class="email-button">Enviar por email</button>
+        <button onclick="enviarWhatsAppModal()" class="whatsapp-button">WhatsApp</button>
+        <button onclick="cerrarModalImpresion()" class="close-button" aria-label="Cerrar">✕</button>
+      </div>
+    </div>
+    <div class="preview-body">
+      <div class="preview-formats">
+        <span class="preview-hint">Formato de vista previa:</span>
+        <button id="formatoTicket" onclick="cambiarFormatoVista('ticket')">Ticket 80 mm</button>
+        <button id="formatoA4" onclick="cambiarFormatoVista('a4')">Factura A4</button>
+      </div>
+      <div id="contenidoDocumentoImprimible">
+        <!-- Se inyecta la estructura de la factura o ticket -->
+      </div>
+    </div>
+  </div>
+</div>
+        <!-- Main Content -->
+        <main>
+            <!-- Login Container -->
+            <div id="login-container" class="card" style="max-width: 420px; margin: 4rem auto;">
+                <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1.5rem; text-align: center; color: #60a5fa;">Iniciar Sesión</h2>
+                <form onsubmit="handleLogin(event)">
+                    <div>
+                        <label style="font-size: 0.85rem; color: #cbd5e1;">Correo Electrónico</label>
+                        <input type="email" id="email" value="demo@gestioncloud.com.ar" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 0.85rem; color: #cbd5e1;">Contraseña</label>
+                        <input type="password" id="password" value="admin123" required>
+                    </div>
+                    <button type="submit" class="btn-blue" style="margin-top: 0.5rem;">Ingresar al Sistema</button>
+                </form>
+            </div>
+
+            <!-- Dashboard Container -->
+            <div id="dashboard-container" class="hidden">
+                <!-- Navigation Tabs -->
+                <div class="tabs">
+                    <button onclick="switchTab('pos')" id="tab-pos" class="tab-btn active">⚡ Caja / POS (F4 Cobrar)</button>
+                    <button onclick="switchTab('inventario')" id="tab-inventario" class="tab-btn">📦 Inventario & Stock</button>
+                    <button onclick="switchTab('historico')" id="tab-historico" class="tab-btn">📋 Histórico de Ventas</button>
+                    <button onclick="switchTab('usuarios')" id="tab-usuarios" class="tab-btn owner-only hidden">👥 Usuarios y Vendedores</button>
+                    <button onclick="switchTab('reportes')" id="tab-reportes" class="tab-btn owner-only hidden">📊 Reportes</button>
+                    <button onclick="switchTab('configuracion')" id="tab-configuracion" class="tab-btn owner-only hidden">⚙️ Configuración ARCA</button>
+                </div>
+
+                <!-- POS Tab Content -->
+                <div id="view-pos" class="grid-pos">
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="font-size: 1.1rem; font-weight: bold; color: #60a5fa;">Catálogo de Productos</h3>
+                            <input type="text" id="buscar-prod" placeholder="🔍 Buscar producto por nombre o código..." oninput="filtrarProductos(this.value)" style="margin: 0; max-width: 280px; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                        </div>
+                        <div id="productos-grid" class="productos-grid">
+                            <!-- Dinámico -->
+                        </div>
+                    </div>
+                    <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h3 style="font-size: 1.1rem; font-weight: bold; color: #60a5fa;">Ticket Actual</h3>
+                                <button onclick="limpiarCarrito()" class="btn-gray" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background-color: #7f1d1d;">Vaciar (F12)</button>
+                            </div>
+                            <div id="ticket-items" style="max-height: 320px; overflow-y: auto; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem; padding-right: 0.25rem;">
+                                <p style="color: #64748b; font-size: 0.85rem; text-align: center; padding: 2rem 0;">No hay productos en el ticket.</p>
+                            </div>
+                        </div>
+                        <div style="border-top: 1px solid #334155; padding-top: 1rem;">
+                            <label for="modo-facturacion" style="display: block; margin-bottom: .35rem; color: #cbd5e1; font-size: .85rem;">Tipo de comprobante</label>
+                            <select id="modo-facturacion" style="margin-bottom: 1rem;">
+                                <option value="sin_arca">Venta interna / sin ARCA</option>
+                                <option value="arca" disabled>Factura ARCA (requiere activación)</option>
+                            </select>
+                            <div style="display: flex; justify-content: space-between; font-size: 1.35rem; font-weight: bold; margin-bottom: 1rem;">
+                                <span>Total:</span>
+                                <span id="ticket-total" style="color: #4ade80;">$0.00</span>
+                            </div>
+                            <button onclick="emitirFactura()" class="btn-green"> cobrar / emitir (F4) </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventario Tab Content -->
+                <div id="view-inventario" class="card hidden">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1.1rem; font-weight: bold; color: #60a5fa;">Gestión de Inventario y Precios</h3>
+                        <div style="display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end;">
+                            <button onclick="abrirModalProducto()" class="btn-blue owner-only" style="width: auto; padding: 0.5rem 1rem; font-size: 0.85rem;">+ Nuevo Producto</button>
+                            <label class="btn-gray" style="cursor: pointer;">Importar CSV
+                                <input type="file" id="inventario-archivo" accept=".csv,text/csv" onchange="importarInventario(event)" hidden>
+                            </label>
+                        </div>
+                    </div>
+                    <p id="inventario-importacion-estado" style="color: #94a3b8; font-size: .8rem; margin-bottom: 1rem;"></p>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Producto</th>
+                                    <th>Precio ($)</th>
+                                    <th>Stock</th>
+                                    <th>Mínimo</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventario-tbody">
+                                <!-- Dinámico -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Historico Tab Content -->
+                <div id="view-historico" class="card hidden">
+                    <h3 style="font-size: 1.1rem; font-weight: bold; margin-bottom: 1rem; color: #60a5fa;">Histórico de Comprobantes Emitidos</h3>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>N° Comprobante</th>
+                                    <th>Fecha / Hora</th>
+                                    <th>Cliente</th>
+                                    <th>Concepto Detallado</th>
+                                    <th>Total ($)</th>
+                                    <th>CAE ARCA</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historico-tbody">
+                                <!-- Dinámico -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Usuarios Tab Content -->
+                <div id="view-usuarios" class="card hidden owner-only">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1.1rem; font-weight: bold; color: #60a5fa;">Gestión de Usuarios y Vendedores</h3>
+                        <button onclick="abrirModalUsuario()" class="btn-blue" style="width: auto; padding: 0.5rem 1rem; font-size: 0.85rem;">+ Nuevo Usuario</button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre</th>
+                                    <th>Correo Electrónico</th>
+                                    <th>Rol</th>
+                                    <th>Caja Asignada</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usuarios-tbody">
+                                <!-- Dinámico -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                    <div id="view-reportes" class="card hidden owner-only">
+                        <h3 style="font-size: 1.1rem; font-weight: bold; color: #60a5fa;">Reportes de ventas</h3>
+                        <p style="color: #94a3b8; font-size: .85rem; margin: .5rem 0 1rem;">Descargá el detalle de ventas por período y vendedor.</p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
+                            <div>
+                                <label>Período</label>
+                                <select id="reporte-periodo">
+                                    <option value="diaria">Diaria</option>
+                                    <option value="semanal">Semanal</option>
+                                    <option value="mensual" selected>Mensual</option>
+                                    <option value="trimestral">Trimestral</option>
+                                    <option value="semestral">Semestral</option>
+                                    <option value="anual">Anual</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>Vendedor</label>
+                                <select id="reporte-vendedor">
+                                    <option value="">Todos los vendedores</option>
+                                </select>
+                            </div>
+                            <button onclick="generarReporte()" class="btn-blue" style="width: auto; margin-bottom: 1rem;">Generar reporte</button>
+                        </div>
+                        <div id="reporte-resumen" class="card hidden" style="padding: 1rem; margin-top: 1rem;"></div>
+                        <button id="reporte-descargar" onclick="descargarReporte()" class="btn-green hidden" style="width: auto; margin-top: 1rem;">Descargar CSV</button>
+                    </div>
+
+                    <div id="view-configuracion" class="card hidden owner-only">
+                        <h3 style="font-size: 1.1rem; font-weight: bold; color: #60a5fa;">Datos del negocio</h3>
+                        <p style="color: #94a3b8; font-size: .85rem; margin: .5rem 0 1rem;">Estos datos aparecen en la vista previa y en los comprobantes. Solo el propietario puede modificarlos.</p>
+                        <form onsubmit="guardarConfiguracionEmpresa(event)" style="max-width: 620px; margin-bottom: 1.5rem;">
+                            <label>Nombre comercial</label>
+                            <input id="empresa-nombre-comercial" required maxlength="150">
+                            <label>Razón social</label>
+                            <input id="empresa-razon-social" required maxlength="150">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div><label>CUIT</label><input id="empresa-cuit" required maxlength="20"></div>
+                                <div><label>Condición IVA</label><input id="empresa-condicion-iva" required maxlength="50"></div>
+                            </div>
+                            <label>Dirección</label>
+                            <input id="empresa-direccion" maxlength="200">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div><label>Teléfono</label><input id="empresa-telefono" maxlength="50"></div>
+                                <div><label>Email comercial</label><input id="empresa-email" type="email" maxlength="150"></div>
+                            </div>
+                            <button type="submit" class="btn-blue">Guardar datos del negocio</button>
+                        </form>
+                        <p id="empresa-estado" style="margin-bottom: 1rem; font-size: .85rem;"></p>
+                        <h3 style="font-size: 1.1rem; font-weight: bold; color: #60a5fa;">Configuración de facturación ARCA</h3>
+                        <p style="color: #94a3b8; font-size: .85rem; margin: .5rem 0 1rem;">Solo el propietario puede activar o desactivar la emisión de comprobantes ARCA.</p>
+                        <form onsubmit="guardarConfiguracionArca(event)" style="max-width: 520px;">
+                            <label style="display: flex; gap: .6rem; align-items: center; margin-bottom: 1rem;">
+                                <input type="checkbox" id="arca-habilitado" style="width: auto; margin: 0;">
+                                Habilitar facturación ARCA
+                            </label>
+                            <label>Ambiente</label>
+                            <select id="arca-ambiente">
+                                <option value="homologacion">Homologación</option>
+                                <option value="produccion">Producción</option>
+                            </select>
+                            <label>Punto de venta</label>
+                            <input type="number" id="arca-punto-venta" min="1" required>
+                            <button type="submit" class="btn-blue">Guardar configuración</button>
+                        </form>
+                        <p id="arca-estado" style="margin-top: 1rem; font-size: .85rem;"></p>
+                        <div style="border-top: 1px solid #334155; margin-top: 1.5rem; padding-top: 1rem;">
+                            <h4 style="color: #fca5a5; margin-bottom: .5rem;">Administración de datos</h4>
+                            <p style="color: #94a3b8; font-size: .8rem; margin-bottom: .75rem;">El backup descarga una copia SQL. La limpieza elimina comprobantes y productos, pero conserva empresa, usuarios y configuración.</p>
+                            <div style="display: flex; gap: .5rem; flex-wrap: wrap;">
+                                <button type="button" class="btn-blue" style="width: auto;" onclick="descargarBackup()">Descargar backup SQL</button>
+                                <button type="button" class="btn-gray" style="background: #991b1b;" onclick="limpiarDatos()">Limpiar ventas e inventario</button>
+                            </div>
+                        </div>
+                    </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Producto -->
+    <div id="modal-producto" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 id="modal-prod-titulo" style="font-size: 1.1rem; font-weight: bold; color: #60a5fa; margin-bottom: 1rem;">Nuevo Producto</h3>
+            <form onsubmit="guardarProducto(event)">
+                <input type="hidden" id="prod-id">
+                <label style="font-size: 0.85rem; color: #cbd5e1;">Código de Barras</label>
+                <input type="text" id="prod-codigo" required>
+                <label style="font-size: 0.85rem; color: #cbd5e1;">Nombre del Producto</label>
+                <input type="text" id="prod-nombre" required>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="font-size: 0.85rem; color: #cbd5e1;">Precio ($)</label>
+                        <input type="number" step="0.01" id="prod-precio" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 0.85rem; color: #cbd5e1;">Stock Inicial</label>
+                        <input type="number" id="prod-stock" required>
+                    </div>
+                </div>
+                <label style="font-size: 0.85rem; color: #cbd5e1;">Stock Mínimo Alerta</label>
+                <input type="number" id="prod-stock-minimo" value="10" required>
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <button type="button" onclick="cerrarModalProducto()" class="btn-gray" style="flex: 1;">Cancelar</button>
+                    <button type="submit" class="btn-blue" style="flex: 1; margin: 0;">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Usuario -->
+    <div id="modal-usuario" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 style="font-size: 1.1rem; font-weight: bold; color: #60a5fa; margin-bottom: 1rem;">Crear Nuevo Usuario / Vendedor</h3>
+            <form onsubmit="guardarUsuario(event)">
+                <label style="font-size: 0.85rem; color: #cbd5e1;">Nombre y Apellido</label>
+                <input type="text" id="user-nombre-input" required>
+                <label style="font-size: 0.85rem; color: #cbd5e1;">Correo Electrónico (Login)</label>
+                <input type="email" id="user-email-input" required>
+                <label style="font-size: 0.85rem; color: #cbd5e1;">Contraseña Temporal</label>
+                <input type="password" id="user-pass-input" required>
+                <label style="font-size: 0.85rem; color: #cbd5e1;">Rol en el Sistema</label>
+                <select id="user-rol-input">
+                    <option value="vendedor">Vendedor / Cajero</option>
+                    <option value="propietario">Propietario / Administrador</option>
+                </select>
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <button type="button" onclick="cerrarModalUsuario()" class="btn-gray" style="flex: 1;">Cancelar</button>
+                    <button type="submit" class="btn-blue" style="flex: 1; margin: 0;">Crear Usuario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('token') || '';
+        let productos = [];
+        let carrito = [];
+        let arcaHabilitado = false;
+
+        if (token) {
+            cargarDashboard();
+        }
+
+        // Atajos de Teclado F4 (Cobrar) y F12 (Limpiar)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'F4') {
+                e.preventDefault();
+                if (!document.getElementById('dashboard-container').classList.contains('hidden')) {
+                    emitirFactura();
+                }
+            } else if (e.key === 'F12') {
+                e.preventDefault();
+                limpiarCarrito();
+            }
+        });
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            try {
+                const res = await axios.post('/api/login', { email, password });
+                if (res.data.success) {
+                    token = res.data.token;
+                    localStorage.setItem('token', token);
+                    cargarDashboard();
+                }
+            } catch (err) {
+                alert('Error al iniciar sesión: ' + (err.response?.data?.error || err.message));
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            token = '';
+            document.getElementById('login-container').classList.remove('hidden');
+            document.getElementById('dashboard-container').classList.add('hidden');
+            document.getElementById('user-header-section').classList.add('hidden');
+        }
+
+        async function cargarDashboard() {
+            document.getElementById('login-container').classList.add('hidden');
+            document.getElementById('dashboard-container').classList.remove('hidden');
+            document.getElementById('user-header-section').classList.remove('hidden');
+            try {
+                const me = await axios.get('/api/me', { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('empresa-nombre').innerText = me.data.user.razon_social;
+                document.getElementById('user-info').innerText = me.data.user.nombre;
+                const rolBadge = document.getElementById('user-role-badge');
+                rolBadge.innerText = me.data.user.rol.toUpperCase();
+                rolBadge.className = `badge ${me.data.user.rol === 'propietario' ? 'badge-admin' : 'badge-vend'}`;
+                document.getElementById('pv-badge').innerText = me.data.user.pv_nombre || 'Caja Principal';
+
+                const prodRes = await axios.get('/api/productos', { headers: { Authorization: `Bearer ${token}` } });
+                productos = prodRes.data;
+                renderProductos(productos);
+                cargarInventario();
+                cargarHistorico();
+                const esPropietario = me.data.user.rol === 'propietario';
+                if (esPropietario) cargarUsuarios();
+                cargarConfiguracionEmpresa();
+                cargarConfiguracionArca(esPropietario);
+            } catch (err) {
+                console.error(err);
+                logout();
+            }
+
+            async function cargarConfiguracionEmpresa() {
+                try {
+                    const res = await axios.get('/api/configuracion/empresa', { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } });
+                    const e = res.data;
+                    document.getElementById('empresa-nombre-comercial').value = e.nombreComercial || '';
+                    document.getElementById('empresa-razon-social').value = e.razonSocial || '';
+                    document.getElementById('empresa-cuit').value = e.cuit || '';
+                    document.getElementById('empresa-condicion-iva').value = e.condicionIva || '';
+                    document.getElementById('empresa-direccion').value = e.direccion || '';
+                    document.getElementById('empresa-telefono').value = e.telefono || '';
+                    document.getElementById('empresa-email').value = e.email || '';
+                } catch (err) {
+                    console.error('No se pudieron cargar los datos del negocio:', err);
+                }
+            }
+
+            async function guardarConfiguracionEmpresa(event) {
+                event.preventDefault();
+                const datos = {
+                    nombre_comercial: document.getElementById('empresa-nombre-comercial').value,
+                    razon_social: document.getElementById('empresa-razon-social').value,
+                    cuit: document.getElementById('empresa-cuit').value,
+                    condicion_iva: document.getElementById('empresa-condicion-iva').value,
+                    direccion: document.getElementById('empresa-direccion').value,
+                    telefono: document.getElementById('empresa-telefono').value,
+                    email: document.getElementById('empresa-email').value
+                };
+                try {
+                    await axios.put('/api/configuracion/empresa', datos, { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } });
+                    document.getElementById('empresa-estado').innerText = 'Datos del negocio actualizados correctamente.';
+                    await cargarDashboard();
+                } catch (err) {
+                    document.getElementById('empresa-estado').innerText = 'No se pudieron guardar los datos.';
+                    alert(err.response?.data?.error || err.message);
+                }
+            }
+        }
+
+        function renderProductos(lista) {
+            const grid = document.getElementById('productos-grid');
+            if (lista.length === 0) {
+                grid.innerHTML = '<p style="color: #64748b; grid-column: span 2; text-align: center; padding: 2rem;">No se encontraron productos.</p>';
+                return;
+            }
+            grid.innerHTML = lista.map(p => `
+                <div onclick="agregarAlCarrito(${p.id})" class="prod-card">
+                    <div>
+                        <h4 style="font-weight: 600; color: #f8fafc; font-size: 0.95rem;">${p.nombre}</h4>
+                        <span style="font-size: 0.75rem; color: #64748b; font-family: monospace;">Cod: ${p.codigo}</span>
+                    </div>
+                    <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: flex-end;">
+                        <span style="color: #4ade80; font-weight: bold; font-size: 1.1rem;">$${parseFloat(p.precio).toFixed(2)}</span>
+                        <span style="font-size: 0.75rem; color: #94a3b8;">Stock: ${p.stock}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filtrarProductos(filtro) {
+            const texto = filtro.toLowerCase();
+            const filtrados = productos.filter(p => p.nombre.toLowerCase().includes(texto) || p.codigo.includes(texto));
+            renderProductos(filtrados);
+        }
+
+        function agregarAlCarrito(id) {
+            const prod = productos.find(p => p.id === id);
+            if (!prod) return;
+            const existe = carrito.find(item => item.id === id);
+            if (existe) {
+                existe.cantidad++;
+            } else {
+                carrito.push({ ...prod, cantidad: 1 });
+            }
+            renderCarrito();
+        }
+
+        function renderCarrito() {
+            const container = document.getElementById('ticket-items');
+            if (carrito.length === 0) {
+                container.innerHTML = '<p style="color: #64748b; font-size: 0.85rem; text-align: center; padding: 2rem 0;">No hay productos en el ticket.</p>';
+                document.getElementById('ticket-total').innerText = '$0.00';
+                return;
+            }
+            let total = 0;
+            container.innerHTML = carrito.map((item, index) => {
+                total += item.precio * item.cantidad;
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; background-color: #0f172a; padding: 0.5rem 0.75rem; border-radius: 0.35rem; border: 1px solid #334155; font-size: 0.85rem;">
+                        <div>
+                            <span style="color: #e2e8f0; display: block; font-weight: 500;">${item.nombre}</span>
+                            <span style="color: #64748b; font-size: 0.75rem;">$${item.precio} x ${item.cantidad}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span style="font-weight: bold; color: #4ade80;">$${(item.precio * item.cantidad).toFixed(2)}</span>
+                            <button onclick="quitarDelCarrito(${index})" style="background-color: #334155; color: #f87171; border: none; padding: 0.1rem 0.4rem; border-radius: 0.25rem; cursor: pointer; font-weight: bold;">×</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('ticket-total').innerText = `$${total.toFixed(2)}`;
+        }
+
+        function quitarDelCarrito(index) {
+            carrito.splice(index, 1);
+            renderCarrito();
+        }
+
+        function limpiarCarrito() {
+            carrito = [];
+            renderCarrito();
+        }
+
+        async function emitirFactura() {
+            if (carrito.length === 0) {
+                alert('El ticket está vacío. Agregue productos para cobrar.');
+                return;
+            }
+
+            try {
+                const items = carrito.map(item => ({
+                    codigo: item.codigo,
+                    descripcion: item.nombre,
+                    cantidad: item.cantidad,
+                    precio: item.precio
+                }));
+                const emitirArca = document.getElementById('modo-facturacion').value === 'arca';
+                const res = await axios.post('/api/facturar', { items, emitir_arca: emitirArca }, { headers: { Authorization: `Bearer ${token}` } });
+
+                if (res.data.success) {
+                    const factura = {
+                        ...res.data,
+                        cuitEmisor: res.data.cuit,
+                        nombreComercial: res.data.nombre_comercial,
+                        razonSocial: res.data.razon_social,
+                        condicionIva: res.data.condicion_iva,
+                        direccion: res.data.direccion,
+                        telefono: res.data.telefono,
+                        receptorNombre: res.data.receptor_nombre,
+                        receptorDoc: res.data.receptor_doc,
+                        receptorCondicionIva: res.data.receptor_condicion_iva,
+                        caeVto: res.data.cae_vto,
+                        qrBase64: res.data.qr,
+                        itemsJson: (res.data.items || []).map(item => ({
+                            ...item,
+                            nombre: item.descripcion
+                        }))
+                    };
+
+                    abrirVistaPrevia(factura);
+                    limpiarCarrito();
+                    cargarDashboard();
+                }
+            } catch (err) {
+                alert('Error al emitir factura: ' + (err.response?.data?.error || err.message));
+            }
+        }
+
+        async function cargarInventario() {
+            const res = await axios.get('/api/inventario', { headers: { Authorization: `Bearer ${token}` } });
+            const tbody = document.getElementById('inventario-tbody');
+            tbody.innerHTML = res.data.items.map(i => `
+                <tr>
+                    <td style="font-family: monospace; color: #94a3b8;">${i.codigo}</td>
+                    <td style="font-weight: 500; color: #f8fafc;">${i.nombre}</td>
+                    <td style="color: #4ade80;">$${i.precio}</td>
+                    <td>${i.stock}</td>
+                    <td style="color: #fca5a5;">${i.stockMinimo}</td>
+                    <td>
+                        <button onclick='editarProducto(${JSON.stringify(i)})' class="btn-gray owner-only" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Editar</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function descargarBackup() {
+            try {
+                const res = await axios.get('/api/backup', {
+                    responseType: 'blob',
+                    headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+                });
+                const url = URL.createObjectURL(res.data);
+                const enlace = document.createElement('a');
+                enlace.href = url;
+                enlace.download = `backup-${new Date().toISOString().slice(0, 10)}.sql`;
+                enlace.click();
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('No se pudo generar el backup: ' + (err.response?.data?.error || err.message));
+            }
+        }
+
+        async function limpiarDatos() {
+            const confirmado = confirm('Se eliminarán todos los comprobantes, productos y stock. Se conservarán usuarios, empresa y configuración. ¿Continuar?');
+            if (!confirmado) return;
+            const segundaConfirmacion = prompt('Escribí LIMPIAR para confirmar la eliminación total de ventas e inventario.');
+            if (segundaConfirmacion !== 'LIMPIAR') return;
+            try {
+                const res = await axios.post('/api/reset-datos', {}, { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } });
+                alert(`Limpieza completada. Comprobantes eliminados: ${res.data.comprobantes}. Productos eliminados: ${res.data.productos}.`);
+                await cargarDashboard();
+            } catch (err) {
+                alert('No se pudo limpiar la información: ' + (err.response?.data?.error || err.message));
+            }
+        }
+
+        async function importarInventario(event) {
+            const archivo = event.target.files[0];
+            if (!archivo) return;
+            const datos = new FormData();
+            datos.append('archivo', archivo);
+            const estado = document.getElementById('inventario-importacion-estado');
+            estado.innerText = 'Importando inventario...';
+            try {
+                const res = await axios.post('/api/inventario/importar', datos, {
+                    headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+                });
+                estado.innerText = `Importación completada: ${res.data.procesados} productos procesados.`;
+                await cargarDashboard();
+            } catch (err) {
+                estado.innerText = 'Error de importación.';
+                alert('No se pudo importar el inventario: ' + (err.response?.data?.error || err.message));
+            } finally {
+                event.target.value = '';
+            }
+        }
+
+        function abrirModalProducto() {
+            document.getElementById('prod-id').value = '';
+            document.getElementById('prod-codigo').value = '';
+            document.getElementById('prod-nombre').value = '';
+            document.getElementById('prod-precio').value = '';
+            document.getElementById('prod-stock').value = '';
+            document.getElementById('prod-stock-minimo').value = '10';
+            document.getElementById('modal-prod-titulo').innerText = 'Nuevo Producto';
+            document.getElementById('modal-producto').classList.remove('hidden');
+        }
+
+        function editarProducto(p) {
+            document.getElementById('prod-id').value = p.id;
+            document.getElementById('prod-codigo').value = p.codigo;
+            document.getElementById('prod-nombre').value = p.nombre;
+            document.getElementById('prod-precio').value = p.precio;
+            document.getElementById('prod-stock').value = p.stock;
+            document.getElementById('prod-stock-minimo').value = p.stockMinimo;
+            document.getElementById('modal-prod-titulo').innerText = 'Editar Producto';
+            document.getElementById('modal-producto').classList.remove('hidden');
+        }
+
+        function cerrarModalProducto() {
+            document.getElementById('modal-producto').classList.add('hidden');
+        }
+
+        async function guardarProducto(e) {
+            e.preventDefault();
+            const id = document.getElementById('prod-id').value;
+            const datos = {
+                codigo: document.getElementById('prod-codigo').value,
+                nombre: document.getElementById('prod-nombre').value,
+                precio: document.getElementById('prod-precio').value,
+                stock: document.getElementById('prod-stock').value,
+                stock_minimo: document.getElementById('prod-stock-minimo').value
+            };
+
+            try {
+                await axios({
+                    method: id ? 'put' : 'post',
+                    url: id ? `/api/productos/${id}` : '/api/productos',
+                    data: datos,
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                cerrarModalProducto();
+                await cargarDashboard();
+            } catch (err) {
+                alert('Error al guardar producto: ' + (err.response?.data?.error || err.message));
+            }
+        }
+
+        async function cargarHistorico() {
+            const res = await axios.get('/api/historico', { headers: { Authorization: `Bearer ${token}` } });
+            const tbody = document.getElementById('historico-tbody');
+            tbody.innerHTML = res.data.map(h => `
+                <tr>
+                    <td style="font-family: monospace; color: #60a5fa; font-weight: bold;">${h.numero}</td>
+                    <td style="color: #cbd5e1; font-size: 0.8rem;">${h.fecha} ${h.hora || ''}</td>
+                    <td style="color: #f8fafc;">${h.receptor_nombre}</td>
+                    <td style="font-size: 0.85rem; color: #94a3b8;">${h.concepto_desc}</td>
+                    <td style="font-weight: bold; color: #4ade80;">$${h.importe}</td>
+                    <td style="font-family: monospace; font-size: 0.75rem; color: #facc15;">${h.cae}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function cargarUsuarios() {
+            const res = await axios.get('/api/usuarios', { headers: { Authorization: `Bearer ${token}` } });
+            const tbody = document.getElementById('usuarios-tbody');
+            tbody.innerHTML = res.data.map(u => `
+                <tr>
+                    <td style="font-family: monospace; color: #94a3b8;">#${u.id}</td>
+                    <td style="font-weight: 500; color: #f8fafc;">${u.nombre}</td>
+                    <td style="color: #cbd5e1;">${u.email}</td>
+                    <td><span class="badge ${u.rol === 'propietario' ? 'badge-admin' : 'badge-vend'}">${u.rol.toUpperCase()}</span></td>
+                    <td style="color: #94a3b8;">${u.pv_nombre || 'Caja Principal'}</td>
+                </tr>
+            `).join('');
+            const selector = document.getElementById('reporte-vendedor');
+            if (selector) {
+                selector.innerHTML = '<option value="">Todos los vendedores</option>' +
+                    res.data.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+            }
+        }
+
+        async function cargarConfiguracionArca(esPropietario) {
+            document.querySelectorAll('.owner-only').forEach(element => {
+                element.classList.toggle('hidden', !esPropietario);
+            });
+            try {
+                const res = await axios.get('/api/configuracion/arca', { headers: { Authorization: `Bearer ${token}` } });
+                document.getElementById('arca-habilitado').checked = res.data.habilitado;
+                document.getElementById('arca-ambiente').value = res.data.ambiente;
+                document.getElementById('arca-punto-venta').value = res.data.punto_venta;
+                actualizarSelectorArca(res.data.habilitado);
+                actualizarEstadoArca(res.data.habilitado);
+            } catch (err) {
+                document.getElementById('arca-estado').innerText = 'No se pudo cargar la configuración ARCA.';
+            }
+        }
+
+        async function guardarConfiguracionArca(event) {
+            event.preventDefault();
+            try {
+                const res = await axios.put('/api/configuracion/arca', {
+                    habilitado: document.getElementById('arca-habilitado').checked,
+                    ambiente: document.getElementById('arca-ambiente').value,
+                    punto_venta: document.getElementById('arca-punto-venta').value
+                }, { headers: { Authorization: `Bearer ${token}` } });
+                actualizarSelectorArca(res.data.habilitado);
+                actualizarEstadoArca(res.data.habilitado);
+                alert('Configuración ARCA guardada.');
+            } catch (err) {
+                alert('Error al guardar configuración: ' + (err.response?.data?.error || err.message));
+            }
+        }
+
+        function actualizarEstadoArca(habilitado) {
+            const estado = document.getElementById('arca-estado');
+            estado.innerText = habilitado
+                ? 'Estado: facturación ARCA habilitada.'
+                : 'Estado: facturación ARCA deshabilitada.';
+            estado.style.color = habilitado ? '#4ade80' : '#facc15';
+        }
+
+        function actualizarSelectorArca(habilitado) {
+            arcaHabilitado = habilitado;
+            const opcion = document.querySelector('#modo-facturacion option[value="arca"]');
+            opcion.disabled = !habilitado;
+            opcion.textContent = habilitado ? 'Factura ARCA' : 'Factura ARCA (requiere activación)';
+            if (!habilitado) document.getElementById('modo-facturacion').value = 'sin_arca';
+        }
+
+        function abrirModalUsuario() {
+            document.getElementById('modal-usuario').classList.remove('hidden');
+        }
+
+        function cerrarModalUsuario() {
+            document.getElementById('modal-usuario').classList.add('hidden');
+        }
+
+        async function guardarUsuario(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('user-nombre-input').value;
+            const email = document.getElementById('user-email-input').value;
+            const password = document.getElementById('user-pass-input').value;
+            const rol = document.getElementById('user-rol-input').value;
+            try {
+                const res = await axios.post('/api/usuarios', { nombre, email, password, rol }, { headers: { Authorization: `Bearer ${token}` } });
+                if (res.data.success) {
+                    alert('¡Usuario creado con éxito!');
+                    cerrarModalUsuario();
+                    cargarUsuarios();
+                }
+            } catch (err) {
+                alert('Error al crear usuario: ' + (err.response?.data?.error || err.message));
+            }
+        }
+
+        let reporteActual = null;
+
+        async function generarReporte() {
+            try {
+                const periodo = document.getElementById('reporte-periodo').value;
+                const vendedor = document.getElementById('reporte-vendedor').value;
+                const params = new URLSearchParams({ periodo });
+                if (vendedor) params.set('vendedor_id', vendedor);
+                const res = await axios.get(`/api/reportes/ventas?${params}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                reporteActual = res.data;
+                const vendedores = res.data.resumen.vendedores
+                    .map(v => `${v.nombre}: ${v.cantidad} comprobantes, $${v.total}`)
+                    .join('<br>');
+                const resumen = document.getElementById('reporte-resumen');
+                resumen.innerHTML = `
+                    <strong>Resultados del período</strong>
+                    <p style="margin-top: .5rem;">Comprobantes: ${res.data.resumen.cantidad}</p>
+                    <p>Total vendido: <strong>$${res.data.resumen.total}</strong></p>
+                    <p style="margin-top: .5rem;">${vendedores || 'Sin ventas en el período.'}</p>
+                `;
+                resumen.classList.remove('hidden');
+                document.getElementById('reporte-descargar').classList.remove('hidden');
+            } catch (err) {
+                alert('Error al generar reporte: ' + (err.response?.data?.error || err.message));
+            }
+        }
+
+        function descargarReporte() {
+            if (!reporteActual) return;
+            const blob = new Blob([`\uFEFF${reporteActual.csv}`], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const enlace = document.createElement('a');
+            enlace.href = url;
+            enlace.download = `reporte-ventas-${reporteActual.periodo}.csv`;
+            enlace.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function switchTab(tab) {
+            ['pos', 'inventario', 'historico', 'usuarios', 'reportes', 'configuracion'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).className = 'tab-btn';
+            });
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).className = 'tab-btn active';
+        }
+
+// Abrir Modal de Vista Previa
+function abrirVistaPrevia(factura) {
+  window.facturaSeleccionada = factura;
+  window.tipoVistaActual = null;
+  document.getElementById('botonImprimirPreview').classList.add('hidden');
+  document.getElementById('formatoTicket').classList.remove('active');
+  document.getElementById('formatoA4').classList.remove('active');
+  document.getElementById('contenidoDocumentoImprimible').innerHTML = `
+    <div style="padding: 3rem 1rem; text-align: center; color: #64748b;">
+      <div style="font-size: 2rem; margin-bottom: .75rem;">🧾</div>
+      <strong>Seleccioná un formato para ver el comprobante</strong>
+      <p style="margin-top: .35rem; font-size: .85rem;">La impresión se habilitará después de elegir Ticket o A4.</p>
+    </div>
+  `;
+  document.getElementById('modalImpresion').classList.remove('hidden');
+}
+
+function cambiarFormatoVista(tipo) {
+  if (tipo !== 'ticket' && tipo !== 'a4') return;
+  window.tipoVistaActual = tipo;
+  generarHtmlDocumento(tipo);
+  document.getElementById('formatoTicket').classList.toggle('active', tipo === 'ticket');
+  document.getElementById('formatoA4').classList.toggle('active', tipo === 'a4');
+  document.getElementById('botonImprimirPreview').classList.remove('hidden');
+}
+
+function imprimirFormato() {
+  if (!window.tipoVistaActual) return;
+  generarHtmlDocumento(window.tipoVistaActual);
+  window.print();
+}
+
+// Generador de HTML para Ticket u Hoja A4 con QR Oficial de ARCA
+function generarHtmlDocumento(tipo) {
+  const f = window.facturaSeleccionada;
+  if (!f) return;
+
+  const itemsHtml = (f.itemsJson || []).map(i => `
+    <tr>
+      <td>${i.nombre}</td>
+      <td class="document-center">${i.cantidad}</td>
+      <td class="document-right">$${Number(i.precio).toFixed(2)}</td>
+      <td class="document-right">$${(i.cantidad * i.precio).toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  const contenedor = document.getElementById('contenidoDocumentoImprimible');
+
+  if (tipo === 'ticket') {
+    contenedor.className = 'document-ticket';
+    contenedor.innerHTML = `
+      <div class="document-center"><strong>${f.nombreComercial || f.razonSocial}</strong></div>
+      <div class="document-center">${f.razonSocial}</div>
+      <div class="document-center">CUIT: ${f.cuitEmisor}</div>
+      ${f.direccion ? `<div class="document-center">${f.direccion}</div>` : ''}
+      ${f.telefono ? `<div class="document-center">Tel: ${f.telefono}</div>` : ''}
+      <hr>
+      <div><strong>Comp:</strong> ${f.numero}</div>
+      <div><strong>Fecha:</strong> ${f.fecha}</div>
+      <hr>
+      <table class="document-table">
+        <thead><tr><th>Producto</th><th>Cant.</th><th class="document-right">Subtotal</th></tr></thead>
+        <tbody>${(f.itemsJson || []).map(i => `<tr><td>${i.nombre}</td><td class="document-center">${i.cantidad}</td><td class="document-right">$${(i.cantidad * i.precio).toFixed(2)}</td></tr>`).join('')}</tbody>
+      </table>
+      <hr>
+      <div class="document-right document-total">TOTAL: $${f.importe}</div>
+      <div>CAE: ${f.cae}</div>
+      <div>Vto. CAE: ${f.caeVto}</div>
+      ${f.es_arca ? `<div class="document-center"><img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(f.qrBase64)}" class="document-qr" alt="QR ARCA"></div>` : '<div class="document-center"><strong>COMPROBANTE NO FISCAL</strong><br>Sin validación ARCA</div>'}
+    `;
+  } else {
+    contenedor.className = 'document-a4';
+    contenedor.innerHTML = `
+      <div class="document-heading">
+        <div>
+          <h1><strong>${f.nombreComercial || f.razonSocial}</strong></h1>
+          <p>${f.razonSocial}</p>
+          <p>${f.direccion || ''}</p>
+          <p>${f.telefono ? `Tel: ${f.telefono}` : ''}</p>
+          <p>Condición IVA: ${f.condicionIva || ''}</p>
+        </div>
+        <div class="document-letter">
+          ${f.es_arca ? '<div>B</div><small>COD. 006</small>' : '<div>NO FISCAL</div><small>DOCUMENTO COMERCIAL</small>'}
+        </div>
+        <div class="document-right">
+          <h2>${f.es_arca ? 'FACTURA' : 'COMPROBANTE COMERCIAL'}</h2>
+          <p>Punto de Venta: 0001 - Nro: ${f.numero}</p>
+          <p>Fecha: ${f.fecha}</p>
+          <p>CUIT: ${f.cuitEmisor}</p>
+        </div>
+      </div>
+      <div style="padding: .75rem; background: #f1f5f9; border-radius: .4rem; font-size: .85rem;">
+        <p><strong>Razón Social / Receptor:</strong> ${f.receptorNombre}</p>
+        <p><strong>Condición IVA:</strong> ${f.receptorCondicionIva}</p>
+      </div>
+      <table class="document-table">
+        <thead>
+          <tr>
+            <th>Descripción</th>
+            <th class="document-center">Cantidad</th>
+            <th class="document-right">Precio Unit.</th>
+            <th class="document-right">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+      <div class="document-footer">
+        <div class="document-center">
+          ${f.es_arca ? `<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(f.qrBase64)}" class="document-qr" alt="QR ARCA"><div>Escaneable ARCA / AFIP</div>` : '<div><strong>COMPROBANTE NO FISCAL</strong><br>Sin validación ARCA</div>'}
+        </div>
+        <div class="document-right">
+          <p>CAE N°: ${f.cae}</p>
+          <p>Vencimiento CAE: ${f.caeVto}</p>
+          <div class="document-total">Importe Total: $${f.importe}</div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function cerrarModalImpresion() {
+  document.getElementById('modalImpresion').classList.add('hidden');
+}
+
+// Enviar por WhatsApp
+function enviarWhatsAppModal() {
+  const f = window.facturaSeleccionada;
+  if (!f) return;
+  
+  const telefono = prompt("Ingrese el número de teléfono del cliente (Ej: 5491123456789):");
+  if (!telefono) return;
+
+  const mensaje = `Hola! Te enviamos el comprobante *${f.numero}* por un total de *$${f.importe}*. CAE: ${f.cae}. Podes verificarlo mediante el QR oficial de ARCA: ${f.qrBase64}`;
+  
+  const urlWhatsApp = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+  window.open(urlWhatsApp, '_blank');
+}
+
+// Enviar por Email mediante el Backend
+async function enviarEmailModal() {
+  const f = window.facturaSeleccionada;
+  if (!f) return;
+
+  const emailDestino = prompt("Ingrese el correo electrónico del destinatario:", f.receptorEmail || "");
+  if (!emailDestino) return;
+
+  try {
+    const res = await fetch('/api/comprobantes/enviar-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ comprobanteId: f.id, email: emailDestino })
+    });
+    
+    const data = await res.json();
+    if (res.ok) {
+      alert("¡Comprobante enviado por email con éxito!");
+    } else {
+      alert("Error al enviar: " + (data.error || "Desconocido"));
+    }
+  } catch (error) {
+    console.error("Error de red:", error);
+    alert("No se pudo conectar con el servidor de correo.");
+  }
+}
+    </script>
+</body>
+</html>

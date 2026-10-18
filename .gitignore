@@ -1,0 +1,19 @@
+node_modules/
+src/generated/prisma/
+
+# Variables y secretos locales
+.env
+.env.*
+!.env.example
+
+# Logs, cobertura y archivos del sistema
+*.log
+coverage/
+.DS_Store
+Thumbs.db
+
+# Backups locales
+*.sql
+*.sql.gz
+!seed.sql
+backups/
